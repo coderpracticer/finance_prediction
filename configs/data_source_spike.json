@@ -45,7 +45,7 @@
       "url_template": "https://www.nasdaq.com/feed/rssoutbound?symbol={symbol}"
     },
     "alpha_vantage_daily": {
-      "enabled": false,
+      "enabled": true,
       "category": "price",
       "api_key_env": "ALPHA_VANTAGE_API_KEY",
       "url_template": "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&apikey={api_key}"

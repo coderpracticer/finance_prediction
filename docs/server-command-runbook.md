@@ -72,6 +72,7 @@ FRA_DATABASE_PATH=data/app.db
 FRA_RAW_DIR=data/raw/mvp
 FRA_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://服务器IP:5173
 SEC_USER_AGENT=FinancialResearchAgent/0.1 your-email@example.com
+ALPHA_VANTAGE_API_KEY=
 
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
 LOCAL_LLM_API_KEY=local
@@ -248,6 +249,20 @@ FAIL AAPL/yahoo_chart_prices: HTTPError: HTTP Error 403: Forbidden
 ```
 
 说明服务器访问该免费数据源被拒绝。此时继续往下跑筛选也可以，系统会尽量使用其它数据源，并在 `warnings` 中标出失败来源。
+
+如果 Yahoo 和 Stooq 都不可用，建议申请 Alpha Vantage free API key，然后写入 `.env`：
+
+```bash
+ALPHA_VANTAGE_API_KEY=你的key
+```
+
+重启后端后再检查：
+
+```bash
+python -m backend.app.data_sources.probe AAPL
+```
+
+此时如果配置正确，应看到 `alpha_vantage_daily` 返回 `PASS`。
 
 完整数据源验证：
 
@@ -462,4 +477,3 @@ cd /home/abc/wxp/finance_prediction/frontend
 npm install
 npm run dev
 ```
-

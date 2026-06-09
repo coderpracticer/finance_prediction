@@ -7,6 +7,7 @@ from backend.app.data_sources.spike import (
     parse_yahoo_chart,
     status_from,
 )
+from backend.app.data_sources.connectors import parse_date_timestamp, parse_optional_float
 
 
 class DataSourceSpikeTests(unittest.TestCase):
@@ -76,6 +77,11 @@ class DataSourceSpikeTests(unittest.TestCase):
         self.assertEqual(status_from(["missing optional field"], [], 10), "partial")
         self.assertEqual(status_from([], [], 0), "weak")
         self.assertEqual(status_from([], ["HTTP 429"], 0), "failed")
+
+    def test_price_parser_helpers(self) -> None:
+        self.assertEqual(parse_optional_float("123.45"), 123.45)
+        self.assertIsNone(parse_optional_float(""))
+        self.assertGreater(parse_date_timestamp("2026-06-09"), 0)
 
 
 if __name__ == "__main__":

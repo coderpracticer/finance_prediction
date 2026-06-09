@@ -24,6 +24,10 @@ def main(argv: list[str] | None = None) -> int:
     sources = client.config["sources"]
     checks = [
         ("yahoo_chart_prices", lambda: client.fetch_yahoo_prices(instrument, sources["yahoo_chart_prices"])),
+        (
+            "alpha_vantage_daily",
+            lambda: client.fetch_alpha_vantage_prices(instrument, sources["alpha_vantage_daily"]),
+        ),
         ("stooq_prices", lambda: client.fetch_stooq_prices(instrument, sources["stooq_prices"])),
         ("nasdaq_stock_rss", lambda: client.fetch_nasdaq_news(instrument, sources["nasdaq_stock_rss"])),
     ]
@@ -53,4 +57,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

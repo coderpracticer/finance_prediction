@@ -98,6 +98,7 @@ FRA_DATABASE_PATH=data/app.db
 FRA_RAW_DIR=data/raw/mvp
 FRA_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://<server-ip>:5173
 SEC_USER_AGENT=FinancialResearchAgent/0.1 your-email@example.com
+ALPHA_VANTAGE_API_KEY=
 
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
 LOCAL_LLM_API_KEY=local
@@ -111,6 +112,7 @@ LOCAL_LLM_TIMEOUT_SECONDS=60
 - 后端会调用 `${LOCAL_LLM_BASE_URL}/chat/completions`。
 - 如果 LLM API 暂时不可用，系统会自动使用规则模板生成降级解释。
 - `FRA_CORS_ORIGINS` 需要包含浏览器访问前端时使用的地址。
+- 如果服务器 IP 访问 Yahoo/Stooq 价格源被 403，可以设置 `ALPHA_VANTAGE_API_KEY` 作为价格 fallback。
 
 ## 4. 安装后端依赖
 
@@ -253,6 +255,12 @@ data/raw/source_spike/
 python -m backend.app.data_sources.probe AAPL
 python -m backend.app.data_sources.probe MSFT
 python -m backend.app.data_sources.probe SPY
+```
+
+如果 `yahoo_chart_prices` 和 `stooq_prices` 都失败，但 `nasdaq_stock_rss`、`sec_companyfacts` 成功，筛选仍会生成候选，只是价格相关因子置信度会较低。要补齐价格因子，可申请 Alpha Vantage free API key，并写入 `.env`：
+
+```bash
+ALPHA_VANTAGE_API_KEY=你的key
 ```
 
 输出示例：

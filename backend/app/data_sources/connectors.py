@@ -59,7 +59,15 @@ class DataSourceClient:
         except Exception as exc:  # noqa: BLE001 - keep other sources usable.
             warnings.append(source_warning(instrument.symbol, "yahoo_chart_prices", exc))
             try:
-                prices = self.fetch_stooq_prices(instrument, source_config["stooq_prices"])
+                prices = self.fetch_alpha_vantage_prices(
+                    instrument,
+                    source_config["alpha_vantage_daily"],
+                )
+            except Exception as alpha_exc:  # noqa: BLE001
+                warnings.append(source_warning(instrument.symbol, "alpha_vantage_daily", alpha_exc))
+            try:
+                if not prices:
+                    prices = self.fetch_stooq_prices(instrument, source_config["stooq_prices"])
             except Exception as fallback_exc:  # noqa: BLE001
                 warnings.append(source_warning(instrument.symbol, "stooq_prices", fallback_exc))
 
@@ -124,6 +132,40 @@ class DataSourceClient:
                     low=_list_get(quote.get("low"), index),
                     close=close,
                     volume=_list_get(quote.get("volume"), index),
+                )
+            )
+        return bars
+
+    def fetch_alpha_vantage_prices(
+        self,
+        instrument: Instrument,
+        config: dict[str, Any],
+    ) -> list[PriceBar]:
+        api_key_env = config.get("api_key_env", "ALPHA_VANTAGE_API_KEY")
+        api_key = os.getenv(api_key_env)
+        if not api_key:
+            raise RuntimeError(f"{api_key_env} is not set.")
+        url = config["url_template"].format(symbol=instrument.symbol, api_key=api_key)
+        payload = _fetch(url, {"Referer": "https://www.alphavantage.co/"})
+        save_snapshot(self.raw_dir, "alpha_vantage_daily", instrument.symbol, payload, "json")
+        data = json.loads(payload.decode("utf-8"))
+        if "Error Message" in data:
+            raise RuntimeError(str(data["Error Message"]))
+        if "Information" in data:
+            raise RuntimeError(str(data["Information"]))
+        series = data.get("Time Series (Daily)")
+        if not isinstance(series, dict) or not series:
+            raise RuntimeError("Alpha Vantage returned no daily time series.")
+        bars: list[PriceBar] = []
+        for date_text, row in sorted(series.items()):
+            bars.append(
+                PriceBar(
+                    timestamp=parse_date_timestamp(date_text),
+                    open=parse_optional_float(row.get("1. open")),
+                    high=parse_optional_float(row.get("2. high")),
+                    low=parse_optional_float(row.get("3. low")),
+                    close=float(row["4. close"]),
+                    volume=parse_optional_float(row.get("5. volume")),
                 )
             )
         return bars
@@ -194,7 +236,6 @@ def _xml_text(item: ET.Element, tag: str) -> str | None:
 
 def parse_stooq_price_bars(text: str) -> list[PriceBar]:
     import csv
-    from datetime import datetime
 
     bars: list[PriceBar] = []
     for row in csv.DictReader(text.splitlines()):
@@ -202,9 +243,7 @@ def parse_stooq_price_bars(text: str) -> list[PriceBar]:
         if not close:
             continue
         date_text = row.get("Date")
-        timestamp = 0
-        if date_text:
-            timestamp = int(datetime.strptime(date_text, "%Y-%m-%d").timestamp())
+        timestamp = parse_date_timestamp(date_text) if date_text else 0
         bars.append(
             PriceBar(
                 timestamp=timestamp,
@@ -224,6 +263,12 @@ def parse_optional_float(value: str | None) -> float | None:
     if value in {None, ""}:
         return None
     return float(value)
+
+
+def parse_date_timestamp(date_text: str) -> int:
+    from datetime import datetime
+
+    return int(datetime.strptime(date_text, "%Y-%m-%d").timestamp())
 
 
 def source_warning(symbol: str, source_name: str, exc: Exception) -> str:
