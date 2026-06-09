@@ -1,0 +1,60 @@
+{
+  "universe": [
+    {
+      "symbol": "AAPL",
+      "name": "Apple Inc.",
+      "market": "US",
+      "stooq_symbol": "aapl.us",
+      "cik": "0000320193"
+    },
+    {
+      "symbol": "MSFT",
+      "name": "Microsoft Corporation",
+      "market": "US",
+      "stooq_symbol": "msft.us",
+      "cik": "0000789019"
+    },
+    {
+      "symbol": "SPY",
+      "name": "SPDR S&P 500 ETF Trust",
+      "market": "US",
+      "stooq_symbol": "spy.us",
+      "cik": null
+    }
+  ],
+  "sources": {
+    "yahoo_chart_prices": {
+      "enabled": true,
+      "category": "price",
+      "url_template": "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=3mo&interval=1d"
+    },
+    "stooq_prices": {
+      "enabled": false,
+      "category": "price",
+      "url_template": "https://stooq.com/q/d/l/?s={stooq_symbol}&i=d"
+    },
+    "sec_companyfacts": {
+      "enabled": true,
+      "category": "fundamentals",
+      "url_template": "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json",
+      "user_agent_env": "SEC_USER_AGENT"
+    },
+    "nasdaq_stock_rss": {
+      "enabled": true,
+      "category": "news",
+      "url_template": "https://www.nasdaq.com/feed/rssoutbound?symbol={symbol}"
+    },
+    "alpha_vantage_daily": {
+      "enabled": false,
+      "category": "price",
+      "api_key_env": "ALPHA_VANTAGE_API_KEY",
+      "url_template": "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&apikey={api_key}"
+    },
+    "financial_modeling_prep_profile": {
+      "enabled": false,
+      "category": "fundamentals",
+      "api_key_env": "FMP_API_KEY",
+      "url_template": "https://financialmodelingprep.com/api/v3/profile/{symbol}?apikey={api_key}"
+    }
+  }
+}
