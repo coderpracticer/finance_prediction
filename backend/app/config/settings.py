@@ -4,6 +4,11 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -15,6 +20,10 @@ class Settings:
     local_llm_api_key: str = "local"
     local_llm_model: str = "local-finance-agent"
     local_llm_timeout_seconds: float = 60.0
+    cors_origins: tuple[str, ...] = (
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    )
 
 
 def get_settings() -> Settings:
@@ -26,5 +35,15 @@ def get_settings() -> Settings:
         local_llm_api_key=os.getenv("LOCAL_LLM_API_KEY", "local"),
         local_llm_model=os.getenv("LOCAL_LLM_MODEL", "local-finance-agent"),
         local_llm_timeout_seconds=float(os.getenv("LOCAL_LLM_TIMEOUT_SECONDS", "60")),
+        cors_origins=parse_csv_env(
+            "FRA_CORS_ORIGINS",
+            ("http://localhost:5173", "http://127.0.0.1:5173"),
+        ),
     )
 
+
+def parse_csv_env(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    value = os.getenv(name)
+    if not value:
+        return default
+    return tuple(item.strip() for item in value.split(",") if item.strip())

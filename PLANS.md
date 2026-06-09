@@ -20,6 +20,8 @@
 - [x] 将筛选结果持久化为正式 screening_runs / candidates 表
 - [x] 实现 Dashboard 自动加载最近一次筛选结果
 - [ ] 接入真实 2 卡 4090 本地 LLM API 并验证研究解释质量
+- [x] 完善服务器从零使用 README
+- [x] 增加环境变量模板
 
 ## Phase 0：数据源验证 spike
 
@@ -46,4 +48,5 @@
 - [x] 实现 candidate chat API
 - [x] 实现前端 Chat 面板
 - [x] 增加核心筛选测试
+- [x] 增加服务器部署与使用说明
 - [ ] 安装 Node/npm 后运行前端 build/dev 验证

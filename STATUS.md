@@ -57,6 +57,18 @@
 - 已实现候选标的追问接口：
   - `POST /api/chat/messages`
 - 已实现 Dashboard 自动加载最近筛选结果和候选 Chat 面板。
+- 已完善从零使用说明：
+  - 后端环境准备
+  - 前端启动
+  - 本地 LLM API 配置
+  - 首次筛选
+  - 数据源验证
+  - 常见问题
+- 已新增环境模板：
+  - `.env.example`
+  - `frontend/.env.example`
+- 已支持 `.env` 自动加载和可配置 CORS：
+  - `FRA_CORS_ORIGINS`
 
 ## In Progress
 
