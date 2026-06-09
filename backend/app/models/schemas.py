@@ -46,6 +46,7 @@ class InstrumentDataset:
     prices: list[PriceBar] = field(default_factory=list)
     news: list[NewsItem] = field(default_factory=list)
     fundamentals: FundamentalSnapshot | None = None
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass

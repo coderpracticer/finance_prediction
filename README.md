@@ -39,6 +39,12 @@ tests/
 
 ## 2. 前置条件
 
+更细的逐条命令请看：
+
+```text
+docs/server-command-runbook.md
+```
+
 推荐服务器环境：
 
 - Linux server
@@ -241,6 +247,27 @@ docs/data-source-validation-report.md
 data/raw/source_spike/
 ```
 
+如果筛选返回 `HTTP 403`，先用单标的数据源诊断命令定位是哪一个源失败：
+
+```bash
+python -m backend.app.data_sources.probe AAPL
+python -m backend.app.data_sources.probe MSFT
+python -m backend.app.data_sources.probe SPY
+```
+
+输出示例：
+
+```text
+PASS AAPL/yahoo_chart_prices: records=64
+FAIL AAPL/stooq_prices: HTTPError: HTTP Error 403: Forbidden
+PASS AAPL/nasdaq_stock_rss: records=15
+PASS AAPL/sec_companyfacts: records=503
+```
+
+若 `yahoo_chart_prices` 403，通常是服务器 IP、机房网络或 Yahoo 反爬导致。当前代码会自动尝试
+`query1.finance.yahoo.com` 和 `query2.finance.yahoo.com`，仍失败时会 fallback 到 Stooq。若价格源都失败，
+系统仍会用新闻和基本面生成低置信度候选，并在 `warnings` 中标明失败来源。
+
 ## 9. 本地 LLM API 要求
 
 后端假设本地 LLM 服务提供 OpenAI-compatible Chat Completions API：
@@ -411,4 +438,3 @@ LLM 不可用时，系统仍会返回规则降级解释。
 3. 运行一次 `POST /api/screening-runs`。
 4. 启动前端 Dashboard。
 5. 在候选详情页中追问研究问题。
-

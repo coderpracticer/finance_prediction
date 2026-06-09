@@ -69,6 +69,12 @@
   - `frontend/.env.example`
 - 已支持 `.env` 自动加载和可配置 CORS：
   - `FRA_CORS_ORIGINS`
+- 已增强服务器数据源排障能力：
+  - 单个数据源失败不再拖垮整个标的。
+  - Yahoo chart 增加 query1/query2 fallback。
+  - price 失败时尝试 Stooq fallback。
+  - warnings 会标明具体失败数据源。
+  - 新增 `python -m backend.app.data_sources.probe SYMBOL`。
 
 ## In Progress
 

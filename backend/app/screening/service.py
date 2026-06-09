@@ -23,6 +23,7 @@ class ScreeningService:
         for instrument in self.data_sources.universe():
             try:
                 dataset = self.data_sources.fetch_dataset(instrument)
+                warnings.extend(dataset.warnings)
                 factors = calculate_factors(dataset)
                 score, confidence, data_quality = aggregate_score(factors)
                 thesis, risks = self.writer.write_candidate_note(
