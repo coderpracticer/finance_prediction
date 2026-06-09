@@ -13,10 +13,10 @@
 ## 后续建议任务
 
 - [x] 进行数据源验证 spike
-- [x] 搭建 Python/FastAPI + React 项目骨架
+- [x] 搭建 Python/FastAPI 项目骨架
 - [x] 实现小 universe 的行情数据采集
 - [x] 实现 MVP 因子计算与候选筛选
-- [x] 实现 Dashboard 第一版
+- [x] 实现后端内置 Dashboard 第一版
 - [x] 将筛选结果持久化为正式 screening_runs / candidates 表
 - [x] 实现 Dashboard 自动加载最近一次筛选结果
 - [ ] 接入真实 2 卡 4090 本地 LLM API 并验证研究解释质量
@@ -37,7 +37,7 @@
 ## Phase 1：MVP 骨架与首版筛选闭环
 
 - [x] 创建 FastAPI 后端入口
-- [x] 创建 React/Vite 前端入口
+- [x] 创建 FastAPI 内置静态 Dashboard
 - [x] 将 spike 数据源升级为正式 connector 雏形
 - [x] 实现 Momentum、Volume/Attention、Event/Catalyst、Quality 覆盖度因子
 - [x] 实现 Top N 候选生成
@@ -46,7 +46,7 @@
 - [x] 实现正式 SQLite repository
 - [x] 实现 latest screening API
 - [x] 实现 candidate chat API
-- [x] 实现前端 Chat 面板
+- [x] 实现内置 Dashboard Chat 面板
 - [x] 增加核心筛选测试
 - [x] 增加服务器部署与使用说明
-- [ ] 安装 Node/npm 后运行前端 build/dev 验证
+- [x] 移除 Node/npm/Vite 前端依赖

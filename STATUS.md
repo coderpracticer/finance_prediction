@@ -34,14 +34,14 @@
   - fundamentals: SEC companyfacts
   - news: Nasdaq stock RSS
 - 已添加 `.gitignore`，避免提交本地数据库和原始快照。
-- 已搭建 FastAPI + React MVP 骨架：
+- 已搭建 FastAPI MVP 骨架：
   - 后端入口：`backend/app/main.py`
   - API 路由：`backend/app/api/routes.py`
   - 数据源 connector：`backend/app/data_sources/connectors.py`
   - 因子引擎：`backend/app/factors/engine.py`
   - 筛选服务：`backend/app/screening/service.py`
   - 本地 LLM 研究解释：`backend/app/research/local_llm.py`
-  - 前端 Dashboard：`frontend/src/pages/Dashboard.tsx`
+  - 内置 Dashboard：`backend/app/web/index.html`
 - 已按 2 卡 4090 本地部署 API 设计 LLM 接入：
   - `LOCAL_LLM_BASE_URL`
   - `LOCAL_LLM_API_KEY`
@@ -56,7 +56,8 @@
   - `GET /api/candidates/{symbol}`
 - 已实现候选标的追问接口：
   - `POST /api/chat/messages`
-- 已实现 Dashboard 自动加载最近筛选结果和候选 Chat 面板。
+- 已实现内置 Dashboard 自动加载最近筛选结果和候选 Chat 面板。
+- 已移除 Node/npm/Vite/React 前端依赖，当前只需启动 FastAPI 后端即可使用 Dashboard。
 - 已完善从零使用说明：
   - 后端环境准备
   - 前端启动
@@ -83,7 +84,7 @@
 ## Next Actions
 
 1. 接入并验证真实 2 卡 4090 本地 LLM API 的研究解释输出。
-2. 在服务器上安装前端依赖并运行 dev/build 验证。
+2. 在服务器上打开 `http://服务器IP:8000/` 验证内置 Dashboard。
 3. 在服务器上跑真实 screening + local LLM chat 联调。
 4. 继续扩展正式 settings 页面和 universe 管理。
 
@@ -110,8 +111,7 @@
   - `/api/screening-runs/latest`
   - `/api/chat/messages` 参数校验
 - FastAPI 前台启动验证通过：`uvicorn` 可启动到 `http://127.0.0.1:8000`。
-- 后台常驻启动在当前 PowerShell/Codex 沙箱里未能稳定保持，因此未留下运行中的 dev server。
-- 前端未验证：当前环境 `node.exe` 拒绝访问，`npm` 不可用。
+- 已用 FastAPI TestClient 验证 `/` 内置 Dashboard 可返回 HTML。
 - 最新数据源验证报告摘要：
   - passed: 8
   - partial: 0

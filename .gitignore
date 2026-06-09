@@ -5,11 +5,7 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 .env
-frontend/.env
 
 data/app.db
 data/*.log
 data/raw/
-
-frontend/node_modules/
-frontend/dist/

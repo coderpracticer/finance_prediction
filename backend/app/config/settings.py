@@ -21,8 +21,8 @@ class Settings:
     local_llm_model: str = "local-finance-agent"
     local_llm_timeout_seconds: float = 60.0
     cors_origins: tuple[str, ...] = (
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
     )
 
 
@@ -37,7 +37,7 @@ def get_settings() -> Settings:
         local_llm_timeout_seconds=float(os.getenv("LOCAL_LLM_TIMEOUT_SECONDS", "60")),
         cors_origins=parse_csv_env(
             "FRA_CORS_ORIGINS",
-            ("http://localhost:5173", "http://127.0.0.1:5173"),
+            ("http://localhost:8000", "http://127.0.0.1:8000"),
         ),
     )
 

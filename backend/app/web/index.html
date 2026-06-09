@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Financial Research Agent</title>
+    <style>
+      :root {
+        color: #1d2430;
+        background: #f6f7f9;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      main {
+        margin: 0 auto;
+        max-width: 1240px;
+        padding: 28px;
+      }
+
+      header {
+        align-items: center;
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        font-size: 26px;
+        margin: 0 0 4px;
+      }
+
+      p {
+        line-height: 1.6;
+      }
+
+      .muted {
+        color: #617084;
+        margin: 0;
+      }
+
+      button {
+        background: #1d4f91;
+        border: 0;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        min-height: 38px;
+        padding: 0 14px;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      input {
+        border: 1px solid #d8dee6;
+        border-radius: 6px;
+        font: inherit;
+        height: 38px;
+        padding: 0 10px;
+      }
+
+      .layout {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+      }
+
+      .panel,
+      .detail {
+        background: #fff;
+        border: 1px solid #dfe4ea;
+        border-radius: 8px;
+      }
+
+      .panel-head {
+        align-items: center;
+        border-bottom: 1px solid #e7ebef;
+        display: flex;
+        justify-content: space-between;
+        padding: 14px 16px;
+      }
+
+      .panel-head h2,
+      .detail h2,
+      .detail h3 {
+        margin: 0;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid #eef1f4;
+        padding: 11px 12px;
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      th {
+        color: #657386;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      tbody tr {
+        cursor: pointer;
+      }
+
+      tbody tr:hover,
+      tbody tr.selected {
+        background: #eef5ff;
+      }
+
+      .symbol {
+        color: #173f77;
+        font-weight: 700;
+      }
+
+      .detail {
+        padding: 16px;
+      }
+
+      .score {
+        color: #1d4f91;
+        font-size: 28px;
+        font-weight: 800;
+      }
+
+      .detail-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .pill {
+        border-radius: 999px;
+        display: inline-block;
+        font-size: 12px;
+        padding: 3px 8px;
+      }
+
+      .good {
+        background: #dff5e8;
+        color: #176b3a;
+      }
+
+      .mixed {
+        background: #fff0cf;
+        color: #7a5400;
+      }
+
+      .weak {
+        background: #f5dfe2;
+        color: #8a2030;
+      }
+
+      .factor {
+        border: 1px solid #e4e8ee;
+        border-radius: 6px;
+        margin-top: 10px;
+        padding: 10px;
+      }
+
+      .factor-row {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .bar {
+        background: #e8edf2;
+        border-radius: 999px;
+        height: 8px;
+        margin: 8px 0;
+        overflow: hidden;
+      }
+
+      .bar div {
+        background: #2e7d63;
+        height: 100%;
+      }
+
+      .notice {
+        background: #fff7df;
+        border: 1px solid #f1d58a;
+        border-radius: 6px;
+        margin-bottom: 14px;
+        padding: 10px 12px;
+      }
+
+      .error {
+        background: #fde8e8;
+        border-color: #f3b7b7;
+      }
+
+      .chat {
+        border-top: 1px solid #e7ebef;
+        margin-top: 16px;
+        padding-top: 14px;
+      }
+
+      .messages {
+        display: grid;
+        gap: 8px;
+        max-height: 240px;
+        overflow-y: auto;
+      }
+
+      .message {
+        border-radius: 6px;
+        line-height: 1.5;
+        padding: 10px;
+      }
+
+      .user {
+        background: #eef5ff;
+      }
+
+      .assistant {
+        background: #f1f4f7;
+      }
+
+      .chat-input {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(0, 1fr) 88px;
+        margin-top: 10px;
+      }
+
+      @media (max-width: 900px) {
+        main {
+          padding: 18px;
+        }
+
+        header,
+        .layout {
+          display: block;
+        }
+
+        header button,
+        .detail {
+          margin-top: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Investment Opportunity Dashboard</h1>
+          <p class="muted">Local screening with self-hosted LLM research notes.</p>
+        </div>
+        <button id="run-button">Run Screening</button>
+      </header>
+
+      <div id="notice"></div>
+
+      <section class="layout">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Latest Candidates</h2>
+            <span id="run-id">loading</span>
+          </div>
+          <div style="overflow-x: auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Symbol</th>
+                  <th>Name</th>
+                  <th>Score</th>
+                  <th>Confidence</th>
+                  <th>Quality</th>
+                </tr>
+              </thead>
+              <tbody id="candidate-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="detail" id="detail">
+          <p class="muted">运行筛选后，点击候选标的查看详情。</p>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      let currentResult = null;
+      let selectedCandidate = null;
+      let chatSessionId = null;
+
+      const runButton = document.querySelector("#run-button");
+      const runId = document.querySelector("#run-id");
+      const candidateBody = document.querySelector("#candidate-body");
+      const detail = document.querySelector("#detail");
+      const notice = document.querySelector("#notice");
+
+      function showNotice(text, isError = false) {
+        notice.innerHTML = text ? `<div class="notice ${isError ? "error" : ""}">${escapeHtml(text)}</div>` : "";
+      }
+
+      async function requestJson(url, options = {}) {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          throw new Error(`${options.method || "GET"} ${url} failed: ${response.status}`);
+        }
+        return response.json();
+      }
+
+      async function loadLatest() {
+        try {
+          const result = await requestJson("/api/screening-runs/latest");
+          renderResult(result);
+        } catch (error) {
+          showNotice(error.message, true);
+          runId.textContent = "failed";
+        }
+      }
+
+      async function runScreening() {
+        runButton.disabled = true;
+        runButton.textContent = "Running";
+        showNotice("");
+        try {
+          const result = await requestJson("/api/screening-runs?limit=10", { method: "POST" });
+          renderResult(result);
+        } catch (error) {
+          showNotice(error.message, true);
+        } finally {
+          runButton.disabled = false;
+          runButton.textContent = "Run Screening";
+        }
+      }
+
+      function renderResult(result) {
+        currentResult = result;
+        selectedCandidate = result.candidates?.[0] || null;
+        runId.textContent = result.run_id || "empty";
+        showNotice((result.warnings || []).join(" | "));
+        candidateBody.innerHTML = "";
+        for (const candidate of result.candidates || []) {
+          const row = document.createElement("tr");
+          row.dataset.symbol = candidate.symbol;
+          row.innerHTML = `
+            <td>${candidate.rank}</td>
+            <td class="symbol">${escapeHtml(candidate.symbol)}</td>
+            <td>${escapeHtml(candidate.name)}</td>
+            <td>${candidate.opportunity_score.toFixed(1)}</td>
+            <td>${candidate.confidence.toFixed(2)}</td>
+            <td><span class="pill ${candidate.data_quality}">${escapeHtml(candidate.data_quality)}</span></td>
+          `;
+          row.addEventListener("click", () => renderDetail(candidate));
+          candidateBody.appendChild(row);
+        }
+        renderDetail(selectedCandidate);
+      }
+
+      function renderDetail(candidate) {
+        selectedCandidate = candidate;
+        chatSessionId = null;
+        document.querySelectorAll("tbody tr").forEach((row) => {
+          row.classList.toggle("selected", row.dataset.symbol === candidate?.symbol);
+        });
+        if (!candidate) {
+          detail.innerHTML = `<p class="muted">暂无候选标的。</p>`;
+          return;
+        }
+        const factors = candidate.factors
+          .map(
+            (factor) => `
+              <div class="factor">
+                <div class="factor-row">
+                  <strong>${escapeHtml(factor.group)} / ${escapeHtml(factor.name)}</strong>
+                  <span>${factor.score.toFixed(1)}</span>
+                </div>
+                <div class="bar"><div style="width:${factor.score}%"></div></div>
+                <p class="muted">${escapeHtml(factor.evidence)}</p>
+              </div>
+            `
+          )
+          .join("");
+        detail.innerHTML = `
+          <div class="detail-top">
+            <div>
+              <h2>${escapeHtml(candidate.symbol)} <span class="muted">${escapeHtml(candidate.name)}</span></h2>
+              <p><span class="pill ${candidate.data_quality}">${escapeHtml(candidate.data_quality)}</span></p>
+            </div>
+            <div class="score">${candidate.opportunity_score.toFixed(1)}</div>
+          </div>
+          <p>${escapeHtml(candidate.thesis)}</p>
+          <h3>Factors</h3>
+          ${factors}
+          <h3>Risks</h3>
+          <ul>${candidate.risks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join("")}</ul>
+          <section class="chat">
+            <h3>Research Chat</h3>
+            <div class="messages" id="messages">
+              <p class="muted">围绕 ${escapeHtml(candidate.symbol)} 追问风险、因子贡献或机会假设。</p>
+            </div>
+            <div class="chat-input">
+              <input id="chat-input" placeholder="例如：最大的反证是什么？" />
+              <button id="chat-send">Send</button>
+            </div>
+          </section>
+        `;
+        document.querySelector("#chat-send").addEventListener("click", sendChat);
+        document.querySelector("#chat-input").addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            sendChat();
+          }
+        });
+      }
+
+      async function sendChat() {
+        const input = document.querySelector("#chat-input");
+        const messages = document.querySelector("#messages");
+        const message = input.value.trim();
+        if (!message || !selectedCandidate) {
+          return;
+        }
+        input.value = "";
+        messages.querySelector(".muted")?.remove();
+        messages.insertAdjacentHTML("beforeend", `<div class="message user">${escapeHtml(message)}</div>`);
+        try {
+          const result = await requestJson("/api/chat/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              symbol: selectedCandidate.symbol,
+              message,
+              session_id: chatSessionId
+            })
+          });
+          chatSessionId = result.session_id;
+          messages.insertAdjacentHTML("beforeend", `<div class="message assistant">${escapeHtml(result.answer)}</div>`);
+        } catch (error) {
+          messages.insertAdjacentHTML("beforeend", `<div class="message assistant">${escapeHtml(error.message)}</div>`);
+        }
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      runButton.addEventListener("click", runScreening);
+      loadLatest();
+    </script>
+  </body>
+</html>
