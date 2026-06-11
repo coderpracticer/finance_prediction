@@ -5,8 +5,7 @@ from datetime import UTC, datetime
 from backend.app.config.settings import Settings
 from backend.app.data_sources.connectors import DataSourceClient
 from backend.app.factors.engine import aggregate_score, calculate_factors
-from backend.app.models.schemas import Candidate, ScreeningResponse
-from backend.app.research.local_llm import LocalLLMResearchWriter
+from backend.app.models.schemas import Candidate, FactorScore, ScreeningResponse
 from backend.app.storage.repository import ResearchRepository
 
 
@@ -14,7 +13,6 @@ class ScreeningService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.data_sources = DataSourceClient(settings.config_path, settings.raw_dir)
-        self.writer = LocalLLMResearchWriter(settings)
         self.repository = ResearchRepository(settings.database_path)
 
     def run(self, limit: int = 10) -> ScreeningResponse:
@@ -26,13 +24,6 @@ class ScreeningService:
                 warnings.extend(dataset.warnings)
                 factors = calculate_factors(dataset)
                 score, confidence, data_quality = aggregate_score(factors)
-                thesis, risks = self.writer.write_candidate_note(
-                    dataset,
-                    factors,
-                    score,
-                    confidence,
-                    data_quality,
-                )
                 candidates.append(
                     Candidate(
                         symbol=instrument.symbol,
@@ -43,8 +34,8 @@ class ScreeningService:
                         confidence=confidence,
                         data_quality=data_quality,
                         factors=factors,
-                        thesis=thesis,
-                        risks=risks,
+                        thesis=build_evidence_summary(factors),
+                        risks=default_risks(data_quality, dataset.warnings),
                     )
                 )
             except Exception as exc:  # noqa: BLE001 - source-specific failures should not kill run.
@@ -65,3 +56,25 @@ class ScreeningService:
 
     def latest(self) -> ScreeningResponse | None:
         return self.repository.get_latest_screening_response()
+
+
+def build_evidence_summary(factors: list[FactorScore]) -> str:
+    top_factors = sorted(factors, key=lambda factor: factor.score, reverse=True)[:3]
+    if not top_factors:
+        return "No usable factor evidence was available."
+    return "; ".join(
+        f"{factor.group}/{factor.name} {factor.score:.1f}: {factor.evidence}"
+        for factor in top_factors
+    )
+
+
+def default_risks(data_quality: str, warnings: list[str]) -> list[str]:
+    risks = [
+        "Free public data can be delayed, incomplete, rate-limited, or changed without notice.",
+        "The screen is a research-priority tool and is not a buy/sell recommendation.",
+    ]
+    if data_quality != "good":
+        risks.append("Current data quality is not strong enough for a high-conviction conclusion.")
+    if warnings:
+        risks.append("Some data sources produced warnings during this run.")
+    return risks

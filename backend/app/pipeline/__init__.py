@@ -1,0 +1,1 @@
+"""Batch report generation pipeline."""

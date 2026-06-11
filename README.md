@@ -1,292 +1,144 @@
 # Financial Research Agent
 
-面向个人投资者的本地优先投资研究智能体 MVP。
+本项目现在是一个本地优先的命令行批处理投资研究报告生成器。
 
-当前版本只有一个服务：FastAPI 后端。Dashboard 已内置在后端中，不再需要 Node、npm、React 或 Vite。
+它不再提供前端、Dashboard、FastAPI API 或聊天交互。核心流程是：从免费公开数据源获取历史数据，自动筛选可研究的 Top N 标的，调用远程 Linux 服务器上的本地 OpenAI-compatible LLM，生成 Markdown 和 PDF 投资研究报告。
 
-浏览器直接打开：
+重要定位：本项目只用于个人投资研究和候选标的优先级排序，不构成投资建议、交易指令或自动交易系统。
 
-```text
-http://服务器IP:8000/
-```
+## 运行环境
 
-重要定位：本项目是个人投资研究辅助工具，不是自动交易系统，也不构成投资建议。
-
-## 1. 前置条件
-
-推荐服务器环境：
+推荐最终部署环境：
 
 - Linux server
 - Python 3.11+
 - uv
-- 可访问外网，用于访问 Yahoo chart、SEC EDGAR、Nasdaq RSS、Alpha Vantage 等公开数据源
-- 可选：本地 OpenAI-compatible LLM API，运行在 2 卡 4090 服务器上
+- 可访问外网，用于 Yahoo chart、SEC EDGAR、Nasdaq RSS、Alpha Vantage 等免费公开数据源
+- 同机或内网可访问的 OpenAI-compatible 本地 LLM API
+- 目标服务器：2 卡 4090，可用于承载本地大模型推理服务
 
-检查命令：
+本仓库只负责调用 LLM API，不负责启动具体模型服务。你可以使用 vLLM、llama.cpp server、Ollama OpenAI-compatible endpoint 或其他兼容 `/v1/chat/completions` 的服务。
 
-```bash
-python --version
-uv --version
-```
-
-如果没有 `uv`：
-
-```bash
-pip install uv
-```
-
-更细命令清单见：
-
-```text
-docs/server-command-runbook.md
-```
-
-## 2. 初始化项目
-
-进入项目根目录：
+## 初始化
 
 ```bash
 cd /home/abc/wxp/finance_prediction
-```
-
-创建环境配置：
-
-```bash
 cp .env.example .env
+uv venv
+source .venv/bin/activate
+uv pip install -e .
 ```
 
 编辑 `.env`：
 
 ```bash
-nano .env
-```
-
-建议配置：
-
-```bash
+FRA_CONFIG_PATH=configs/data_source_spike.json
 FRA_DATABASE_PATH=data/app.db
 FRA_RAW_DIR=data/raw/mvp
-FRA_CORS_ORIGINS=http://服务器IP:8000,http://localhost:8000,http://127.0.0.1:8000
+FRA_REPORT_DIR=reports
+
 SEC_USER_AGENT=FinancialResearchAgent/0.1 your-email@example.com
 ALPHA_VANTAGE_API_KEY=
 
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
 LOCAL_LLM_API_KEY=local
 LOCAL_LLM_MODEL=your-local-model-name
-LOCAL_LLM_TIMEOUT_SECONDS=60
+LOCAL_LLM_TIMEOUT_SECONDS=180
 ```
 
-说明：
+`LOCAL_LLM_BASE_URL` 建议指向同一台 2 卡 4090 Linux 服务器上运行的本地 LLM API。如果模型服务在另一台机器，把地址换成内网可访问地址。
 
-- `LOCAL_LLM_BASE_URL` 指向本地 LLM 的 OpenAI-compatible endpoint。
-- 后端会调用 `${LOCAL_LLM_BASE_URL}/chat/completions`。
-- 如果 LLM API 暂时不可用，系统会自动使用规则模板生成降级解释。
-- 如果服务器 IP 访问 Yahoo/Stooq 价格源被 403，可以设置 `ALPHA_VANTAGE_API_KEY` 作为价格 fallback。
+## 生成报告
 
-## 3. 安装后端依赖
+默认生成 Top 10 候选，并同时输出 Markdown 和 PDF：
 
 ```bash
-uv venv
-source .venv/bin/activate
-uv pip install -e .
+python -m backend.app.cli generate-report
 ```
 
-运行测试：
+等价的 console script：
 
 ```bash
-python -m unittest discover -s tests
+fra-report generate-report
 ```
 
-预期：
+常用参数：
+
+```bash
+python -m backend.app.cli generate-report \
+  --top-n 10 \
+  --horizons short,medium \
+  --config configs/data_source_spike.json \
+  --output-dir reports
+```
+
+输出示例：
 
 ```text
-OK
+reports/
+  2026-06-11/
+    investment_report_20260611T091500000000Z.md
+    investment_report_20260611T091500000000Z.pdf
 ```
 
-## 4. 启动后端与 Dashboard
+如果本地 LLM API 不可用、模型名错误、端口错误或返回空内容，命令会直接失败并提示配置问题，不会生成规则 fallback 报告。
+
+## 数据源
+
+当前默认 universe 在 `configs/data_source_spike.json` 中，优先覆盖免费公开数据较稳定的美股/ETF 标的。
+
+当前数据源：
+
+- Yahoo chart endpoint：价格历史
+- SEC companyfacts：基本面字段覆盖度
+- Nasdaq stock RSS：新闻标题
+- Alpha Vantage daily：可选价格 fallback，需要免费 API key
+- Stooq：价格 fallback
+
+诊断单个标的：
 
 ```bash
-source .venv/bin/activate
-python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-看到下面内容后，不要关闭这个终端：
-
-```text
-Uvicorn running on http://0.0.0.0:8000
-Application startup complete.
-```
-
-浏览器打开：
-
-```text
-http://服务器IP:8000/
-```
-
-## 5. 检查服务
-
-新开终端：
-
-```bash
-curl http://127.0.0.1:8000/api/health
-```
-
-预期：
-
-```json
-{"status":"ok"}
-```
-
-查看配置：
-
-```bash
-curl http://127.0.0.1:8000/api/settings
-```
-
-## 6. 诊断数据源
-
-```bash
-source .venv/bin/activate
-
 python -m backend.app.data_sources.probe AAPL
 python -m backend.app.data_sources.probe MSFT
 python -m backend.app.data_sources.probe SPY
 ```
 
-如果 Yahoo/Stooq 价格源失败，但 Nasdaq RSS 和 SEC 成功，系统仍可生成候选，只是价格因子置信度会较低。
+如果服务器 IP 被 Yahoo/Stooq 限制，可以配置 `ALPHA_VANTAGE_API_KEY`。
 
-若想补齐价格因子，申请 Alpha Vantage free API key 后写入 `.env`：
-
-```bash
-ALPHA_VANTAGE_API_KEY=你的key
-```
-
-然后重启后端。
-
-## 7. 手动运行筛选
+## 验证
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/api/screening-runs?limit=10"
+python -m unittest discover -s tests
+python -m compileall backend
 ```
 
-读取最近一次结果：
+本地没有安装 `reportlab` 时，PDF 单元测试会跳过；服务器执行 `uv pip install -e .` 后应默认安装并启用 PDF 输出。
 
-```bash
-curl http://127.0.0.1:8000/api/screening-runs/latest
-```
-
-读取某个候选标的：
-
-```bash
-curl http://127.0.0.1:8000/api/candidates/AAPL
-```
-
-围绕候选标的追问：
-
-```bash
-curl -X POST "http://127.0.0.1:8000/api/chat/messages" \
-  -H "Content-Type: application/json" \
-  -d '{"symbol":"AAPL","message":"最大的反证是什么？"}'
-```
-
-## 8. 常用 API
-
-| Method | Path | 用途 |
-| --- | --- | --- |
-| GET | `/` | 内置 Dashboard |
-| GET | `/api/health` | 健康检查 |
-| GET | `/api/settings` | 查看运行配置摘要 |
-| POST | `/api/screening-runs?limit=10` | 手动触发筛选 |
-| GET | `/api/screening-runs/latest` | 读取最近一次筛选结果 |
-| GET | `/api/candidates/{symbol}` | 读取候选详情 |
-| POST | `/api/chat/messages` | 围绕候选标的追问 |
-
-## 9. 生成的数据
-
-运行后会产生：
+## 主要模块
 
 ```text
-data/app.db
-data/raw/mvp/
-data/raw/source_spike/
+backend/app/cli.py
+backend/app/pipeline/report_pipeline.py
+backend/app/screening/service.py
+backend/app/research/local_llm.py
+backend/app/research/prompts.py
+backend/app/reports/markdown.py
+backend/app/reports/pdf.py
+backend/app/data_sources/connectors.py
+backend/app/factors/engine.py
+backend/app/storage/repository.py
 ```
 
-这些属于本地运行数据，默认已在 `.gitignore` 中忽略。
-
-SQLite 中的核心表：
-
-- `screening_runs`
-- `candidates`
-- `factor_scores`
-- `chat_sessions`
-- `chat_messages`
-
-## 10. 常见问题
-
-### 浏览器打不开 Dashboard
-
-确认后端已启动：
-
-```bash
-curl http://127.0.0.1:8000/api/health
-```
-
-确认服务器防火墙或安全组放行 `8000`。
-
-浏览器访问：
-
-```text
-http://服务器IP:8000/
-```
-
-### 数据源 403
-
-先运行：
-
-```bash
-python -m backend.app.data_sources.probe AAPL
-```
-
-如果 Yahoo/Stooq 都失败，配置 `ALPHA_VANTAGE_API_KEY`。
-
-### 本地 LLM 没有回答
-
-检查：
-
-```bash
-curl http://127.0.0.1:8001/v1/models
-```
-
-如果你的 LLM server 不提供 `/v1/models`，至少确认 `/v1/chat/completions` 可用。
-
-LLM 不可用时，系统仍会返回规则降级解释。
-
-## 11. 最小成功路径
-
-终端 1：
+## 最小成功路径
 
 ```bash
 cd /home/abc/wxp/finance_prediction
 cp .env.example .env
+nano .env
 uv venv
 source .venv/bin/activate
 uv pip install -e .
 python -m unittest discover -s tests
-python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-终端 2：
-
-```bash
-cd /home/abc/wxp/finance_prediction
-source .venv/bin/activate
-curl http://127.0.0.1:8000/api/health
 python -m backend.app.data_sources.probe AAPL
-curl -X POST "http://127.0.0.1:8000/api/screening-runs?limit=10"
-```
-
-浏览器：
-
-```text
-http://服务器IP:8000/
+python -m backend.app.cli generate-report --top-n 10
 ```

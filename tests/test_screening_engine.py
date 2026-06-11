@@ -8,7 +8,7 @@ from backend.app.models.schemas import (
     NewsItem,
     PriceBar,
 )
-from backend.app.research.local_llm import fallback_note
+from backend.app.screening.service import build_evidence_summary, default_risks
 
 
 class ScreeningEngineTests(unittest.TestCase):
@@ -54,19 +54,23 @@ class ScreeningEngineTests(unittest.TestCase):
         self.assertGreater(confidence, 0)
         self.assertIn(data_quality, {"good", "mixed", "weak"})
 
-    def test_fallback_note_mentions_uncertainty(self) -> None:
+    def test_build_evidence_summary_uses_top_factors(self) -> None:
         dataset = InstrumentDataset(
             instrument=Instrument(symbol="TEST", name="Test Corp"),
             prices=[PriceBar(timestamp=1, close=100, volume=1000)],
         )
         factors = calculate_factors(dataset)
-        note = fallback_note(dataset, factors, 52.5, 0.42, "weak")
+        summary = build_evidence_summary(factors)
 
-        self.assertIn("TEST", note)
-        self.assertIn("机会", note)
-        self.assertIn("数据质量", note)
+        self.assertIn("Momentum", summary)
+        self.assertIn("price_momentum", summary)
+
+    def test_default_risks_marks_weak_data_quality(self) -> None:
+        risks = default_risks("weak", ["TEST/yahoo_chart_prices: HTTP 429"])
+
+        self.assertTrue(any("data quality" in risk for risk in risks))
+        self.assertTrue(any("warnings" in risk for risk in risks))
 
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -20,6 +20,97 @@
       "market": "US",
       "stooq_symbol": "spy.us",
       "cik": null
+    },
+    {
+      "symbol": "NVDA",
+      "name": "NVIDIA Corporation",
+      "market": "US",
+      "stooq_symbol": "nvda.us",
+      "cik": "0001045810"
+    },
+    {
+      "symbol": "AMZN",
+      "name": "Amazon.com, Inc.",
+      "market": "US",
+      "stooq_symbol": "amzn.us",
+      "cik": "0001018724"
+    },
+    {
+      "symbol": "GOOGL",
+      "name": "Alphabet Inc.",
+      "market": "US",
+      "stooq_symbol": "googl.us",
+      "cik": "0001652044"
+    },
+    {
+      "symbol": "META",
+      "name": "Meta Platforms, Inc.",
+      "market": "US",
+      "stooq_symbol": "meta.us",
+      "cik": "0001326801"
+    },
+    {
+      "symbol": "TSLA",
+      "name": "Tesla, Inc.",
+      "market": "US",
+      "stooq_symbol": "tsla.us",
+      "cik": "0001318605"
+    },
+    {
+      "symbol": "JPM",
+      "name": "JPMorgan Chase & Co.",
+      "market": "US",
+      "stooq_symbol": "jpm.us",
+      "cik": "0000019617"
+    },
+    {
+      "symbol": "UNH",
+      "name": "UnitedHealth Group Incorporated",
+      "market": "US",
+      "stooq_symbol": "unh.us",
+      "cik": "0000731766"
+    },
+    {
+      "symbol": "XOM",
+      "name": "Exxon Mobil Corporation",
+      "market": "US",
+      "stooq_symbol": "xom.us",
+      "cik": "0000034088"
+    },
+    {
+      "symbol": "V",
+      "name": "Visa Inc.",
+      "market": "US",
+      "stooq_symbol": "v.us",
+      "cik": "0001403161"
+    },
+    {
+      "symbol": "MA",
+      "name": "Mastercard Incorporated",
+      "market": "US",
+      "stooq_symbol": "ma.us",
+      "cik": "0001141391"
+    },
+    {
+      "symbol": "HD",
+      "name": "The Home Depot, Inc.",
+      "market": "US",
+      "stooq_symbol": "hd.us",
+      "cik": "0000354950"
+    },
+    {
+      "symbol": "PG",
+      "name": "The Procter & Gamble Company",
+      "market": "US",
+      "stooq_symbol": "pg.us",
+      "cik": "0000080424"
+    },
+    {
+      "symbol": "COST",
+      "name": "Costco Wholesale Corporation",
+      "market": "US",
+      "stooq_symbol": "cost.us",
+      "cik": "0000909832"
     }
   ],
   "sources": {

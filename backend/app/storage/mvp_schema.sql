@@ -35,19 +35,3 @@ CREATE TABLE IF NOT EXISTS factor_scores (
 
 CREATE INDEX IF NOT EXISTS idx_candidates_run_rank ON candidates(run_id, rank);
 CREATE INDEX IF NOT EXISTS idx_factor_scores_candidate ON factor_scores(candidate_id);
-
-CREATE TABLE IF NOT EXISTS chat_sessions (
-    id TEXT PRIMARY KEY,
-    symbol TEXT,
-    created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS chat_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT NOT NULL,
-    role TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY (session_id) REFERENCES chat_sessions(id)
-);
-

@@ -170,24 +170,6 @@ class ResearchRepository:
                 return None
             return self._candidate_from_row(connection, row)
 
-    def save_chat_message(self, session_id: str, role: str, content: str, symbol: str | None) -> None:
-        now = utc_now()
-        with self._connection() as connection:
-            connection.execute(
-                """
-                INSERT OR IGNORE INTO chat_sessions (id, symbol, created_at)
-                VALUES (?, ?, ?)
-                """,
-                (session_id, symbol, now),
-            )
-            connection.execute(
-                """
-                INSERT INTO chat_messages (session_id, role, content, created_at)
-                VALUES (?, ?, ?, ?)
-                """,
-                (session_id, role, content, now),
-            )
-
     def _candidate_from_row(
         self,
         connection: sqlite3.Connection,
