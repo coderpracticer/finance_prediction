@@ -62,3 +62,14 @@
 - `python -m backend.app.cli --help`: CLI help renders successfully.
 - Source scan found no active FastAPI/Dashboard/API/chat route references.
 - `git status` without safe-directory override is blocked by Git dubious ownership protection; read-only status works with `git -c safe.directory="C:/Users/Administrator/Documents/New project"`.
+
+## Latest Documentation Update
+
+- Simplified `README.md` into a short path:
+  - start `vLLM`
+  - install project
+  - configure `.env`
+  - generate report
+  - run validation
+- Simplified `docs/server-command-runbook.md` with the same vLLM-first deployment flow.
+- Kept troubleshooting minimal and command-oriented.

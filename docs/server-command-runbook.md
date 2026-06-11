@@ -1,8 +1,8 @@
 # Server Command Runbook
 
-面向远程 2 卡 4090 Linux 服务器的命令行部署清单。
+这份 runbook 只保留服务器上最短可执行路径：先启动 `vLLM`，再运行项目。
 
-## 1. 基础环境
+## 1. 检查环境
 
 ```bash
 python --version
@@ -10,26 +10,46 @@ uv --version
 nvidia-smi
 ```
 
-建议：
+期望：
 
 ```text
 Python >= 3.11
 uv available
-2 x RTX 4090 visible in nvidia-smi
+2 x RTX 4090 visible
 ```
 
-## 2. 安装项目
+## 2. 启动 vLLM
+
+```bash
+vllm serve Qwen/Qwen2.5-32B-Instruct \
+  --host 0.0.0.0 \
+  --port 8001 \
+  --tensor-parallel-size 2
+```
+
+检查：
+
+```bash
+curl http://127.0.0.1:8001/v1/models
+```
+
+项目只要求兼容：
+
+```text
+POST /v1/chat/completions
+```
+
+## 3. 安装项目
 
 ```bash
 cd /home/abc/wxp/finance_prediction
 cp .env.example .env
-nano .env
 uv venv
 source .venv/bin/activate
 uv pip install -e .
 ```
 
-推荐 `.env`：
+## 4. 配置 `.env`
 
 ```bash
 FRA_CONFIG_PATH=configs/data_source_spike.json
@@ -42,40 +62,8 @@ ALPHA_VANTAGE_API_KEY=
 
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
 LOCAL_LLM_API_KEY=local
-LOCAL_LLM_MODEL=your-local-model-name
+LOCAL_LLM_MODEL=Qwen/Qwen2.5-32B-Instruct
 LOCAL_LLM_TIMEOUT_SECONDS=180
-```
-
-## 3. 启动或确认本地 LLM API
-
-项目要求一个 OpenAI-compatible endpoint：
-
-```text
-POST /v1/chat/completions
-```
-
-可选检查：
-
-```bash
-curl http://127.0.0.1:8001/v1/models
-```
-
-有些推理服务不实现 `/v1/models`，但必须实现 `/v1/chat/completions`。
-
-## 4. 数据源诊断
-
-```bash
-source .venv/bin/activate
-python -m backend.app.data_sources.probe AAPL
-python -m backend.app.data_sources.probe MSFT
-python -m backend.app.data_sources.probe SPY
-```
-
-如果价格源被限制：
-
-```bash
-nano .env
-# set ALPHA_VANTAGE_API_KEY=your-free-key
 ```
 
 ## 5. 生成报告
@@ -84,16 +72,7 @@ nano .env
 python -m backend.app.cli generate-report --top-n 10
 ```
 
-指定输出目录：
-
-```bash
-python -m backend.app.cli generate-report \
-  --top-n 10 \
-  --horizons short,medium \
-  --output-dir reports
-```
-
-成功输出：
+成功输出类似：
 
 ```text
 run_id=...
@@ -103,43 +82,37 @@ markdown=reports/YYYY-MM-DD/investment_report_....md
 pdf=reports/YYYY-MM-DD/investment_report_....pdf
 ```
 
-## 6. 验证
+## 6. 本地验证
 
 ```bash
 python -m unittest discover -s tests
 python -m compileall backend
 ```
 
-## 7. 常见排查
+## 7. 排错
 
-LLM 连接失败：
+LLM API 没连上：
 
 ```bash
 ss -lntp | grep 8001
 curl http://127.0.0.1:8001/v1/models
 ```
 
-依赖缺失：
+依赖问题：
 
 ```bash
 source .venv/bin/activate
 uv pip install -e .
 ```
 
-数据库是否生成：
+数据源失败：
 
 ```bash
-ls -lh data/app.db
+python -m backend.app.data_sources.probe AAPL
 ```
 
-报告是否生成：
+报告路径：
 
 ```bash
 find reports -maxdepth 3 -type f | sort | tail
-```
-
-原始数据快照：
-
-```bash
-find data/raw -maxdepth 3 -type f | head
 ```

@@ -1,0 +1,286 @@
+请将本项目的本地大模型部署方式固定为 **vLLM OpenAI-compatible API**，用于部署 Qwen3-8B，并修改项目中的 LLM 调用模块、配置文件和 README。
+
+# 1. vLLM 部署目标
+
+本项目使用本地 vLLM 部署 Qwen3-8B，提供 OpenAI-compatible Chat Completions API。
+
+默认服务地址：
+
+http://localhost:8000/v1/chat/completions
+
+默认模型名：
+
+Qwen/Qwen3-8B
+
+项目中的 LLMClient 必须通过 vLLM 的 OpenAI-compatible API 调用本地模型。
+
+# 2. 安装依赖
+
+README 中加入：
+
+pip install vllm
+
+如果使用 CUDA 环境，请确保 PyTorch、CUDA、vLLM 版本匹配。
+
+# 3. vLLM 启动命令
+
+在 README 中加入以下启动方式。
+
+## 单卡启动
+
+vllm serve Qwen/Qwen3-8B 
+--host 0.0.0.0 
+--port 8000 
+--dtype auto 
+--max-model-len 32768 
+--gpu-memory-utilization 0.90 
+--trust-remote-code
+
+## 双卡4090张量并行启动
+
+vllm serve Qwen/Qwen3-8B 
+--host 0.0.0.0 
+--port 8000 
+--dtype auto 
+--max-model-len 32768 
+--tensor-parallel-size 2 
+--gpu-memory-utilization 0.90 
+--trust-remote-code
+
+注意：
+
+* 如果显存不足，可以把 --max-model-len 改为 8192 或 16384。
+* 如果 Qwen3-8B 单卡已能运行，可以不用 tensor parallel。
+* 2卡4090运行 Qwen3-8B 通常足够，优先保证稳定性。
+* 如果遇到模型名不匹配，使用 vLLM 启动日志中显示的 served model name。
+
+# 4. config.yaml 修改
+
+将 llm 配置修改为：
+
+llm:
+enabled: true
+provider: "vllm"
+base_url: "http://localhost:8000/v1/chat/completions"
+model: "Qwen/Qwen3-8B"
+temperature: 0.1
+top_p: 0.9
+max_tokens: 1200
+timeout: 120
+retries: 2
+
+# 5. llm_client.py 要求
+
+实现 VLLMClient，使用 requests.post 调用：
+
+POST http://localhost:8000/v1/chat/completions
+
+请求 JSON 格式：
+
+{
+"model": "Qwen/Qwen3-8B",
+"messages": [
+{"role": "system", "content": system_prompt},
+{"role": "user", "content": user_prompt}
+],
+"temperature": 0.1,
+"top_p": 0.9,
+"max_tokens": 1200
+}
+
+响应解析：
+
+response_json["choices"][0]["message"]["content"]
+
+要求：
+
+* 捕获 requests.Timeout、requests.ConnectionError、HTTPError 和通用 Exception；
+* 失败时最多重试 retries 次；
+* 每次请求和响应都记录到 data/logs/llm_raw_responses.jsonl；
+* 如果最终失败，返回 None，让 agents.py 使用规则版 fallback；
+* 不要把异常吞掉，要写入日志；
+* 支持 health_check()，用于检测 vLLM 服务是否可用。
+
+# 6. health_check 实现
+
+VLLMClient.health_check()：
+
+* 向 base_url 发送一个极短请求；
+* system prompt: "You are a helpful assistant."
+* user prompt: "Return JSON: {"ok": true}"
+* max_tokens: 20
+* 如果能正常解析返回内容，则认为服务可用；
+* 如果失败，返回 False。
+
+main.py 在运行 --step agent 前，先调用 health_check。
+如果 health_check 失败：
+
+* 打印 warning；
+* 自动启用规则版 fallback；
+* 不中断整个实验。
+
+# 7. llm_client.py 示例代码
+
+请按以下思路实现：
+
+import json
+import time
+import requests
+from pathlib import Path
+from datetime import datetime
+
+class VLLMClient:
+def **init**(self, config, log_path):
+self.base_url = config["base_url"]
+self.model = config["model"]
+self.temperature = config.get("temperature", 0.1)
+self.top_p = config.get("top_p", 0.9)
+self.max_tokens = config.get("max_tokens", 1200)
+self.timeout = config.get("timeout", 120)
+self.retries = config.get("retries", 2)
+self.log_path = Path(log_path)
+self.log_path.parent.mkdir(parents=True, exist_ok=True)
+
+```
+def chat(self, system_prompt: str, user_prompt: str, max_tokens=None):
+    payload = {
+        "model": self.model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": self.temperature,
+        "top_p": self.top_p,
+        "max_tokens": max_tokens or self.max_tokens
+    }
+
+    last_error = None
+
+    for attempt in range(self.retries + 1):
+        try:
+            resp = requests.post(
+                self.base_url,
+                json=payload,
+                timeout=self.timeout
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            content = data["choices"][0]["message"]["content"]
+
+            self._log(payload, data, None)
+            return content
+
+        except Exception as e:
+            last_error = repr(e)
+            self._log(payload, None, last_error)
+            time.sleep(1.5 * (attempt + 1))
+
+    return None
+
+def health_check(self):
+    result = self.chat(
+        "You are a helpful assistant.",
+        "Return JSON only: {\"ok\": true}",
+        max_tokens=20
+    )
+    return result is not None and "ok" in result.lower()
+
+def _log(self, payload, response, error):
+    record = {
+        "time": datetime.now().isoformat(),
+        "model": self.model,
+        "payload": payload,
+        "response": response,
+        "error": error
+    }
+    with self.log_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+```
+
+# 8. Qwen3 思考模式注意事项
+
+如果 Qwen3 输出包含思考内容、Markdown 或多余文本，utils.robust_json_loads 必须能从返回文本中截取第一个 { 到最后一个 } 并解析。
+
+Prompt 中要反复强调：
+
+输出必须是严格 JSON。
+不要输出 Markdown。
+不要输出解释。
+不要输出代码块。
+不要输出 JSON 之外的任何内容。
+
+# 9. 测试 vLLM 是否启动成功
+
+README 中加入测试命令：
+
+curl http://localhost:8000/v1/chat/completions 
+-H "Content-Type: application/json" 
+-d '{
+"model": "Qwen/Qwen3-8B",
+"messages": [
+{"role": "system", "content": "You are a helpful assistant."},
+{"role": "user", "content": "Return JSON only: {"ok": true}"}
+],
+"temperature": 0.1,
+"max_tokens": 20
+}'
+
+如果返回 choices[0].message.content，说明服务正常。
+
+# 10. main.py 修改
+
+运行 agent 步骤时：
+
+* 如果 llm.enabled = false，直接使用规则版 fallback；
+* 如果 llm.provider = vllm，初始化 VLLMClient；
+* 调用 health_check；
+* health_check 成功则使用 LLM 多智能体；
+* health_check 失败则打印警告并使用规则版 fallback。
+
+# 11. agents.py 修改
+
+MultiAgentAllocator 支持：
+
+use_llm: bool
+
+如果 use_llm=True：
+
+* 调用 VLLMClient 生成各Agent输出；
+* 如果任意Agent JSON解析失败，则该周使用规则版 fallback。
+
+如果 use_llm=False：
+
+* 直接使用规则版 fallback。
+
+每周输出中增加字段：
+
+llm_used: true/false
+fallback_used: true/false
+fallback_reason: str
+
+# 12. README 中的运行顺序
+
+README 中写：
+
+第一步，启动 vLLM：
+
+vllm serve Qwen/Qwen3-8B 
+--host 0.0.0.0 
+--port 8000 
+--dtype auto 
+--max-model-len 32768 
+--tensor-parallel-size 2 
+--gpu-memory-utilization 0.90 
+--trust-remote-code
+
+第二步，新开终端运行项目：
+
+pip install -r requirements.txt
+python main.py --step all
+
+如果暂时不想启用大模型，可以在 config.yaml 中设置：
+
+llm:
+enabled: false
+
+此时项目会使用规则版 fallback 策略完成完整回测。

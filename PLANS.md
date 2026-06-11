@@ -1,6 +1,6 @@
 # PLANS
 
-## Current Task: Simplify To CLI Batch Report Generator
+## Current Task: Simplify Server Tutorial
 
 - [x] Clarify final product shape: no frontend, no API, no user interaction design.
 - [x] Confirm report flow: free public data -> automatic Top N screen -> local LLM report.
@@ -15,10 +15,13 @@
 - [x] Expand default universe beyond 10 candidates.
 - [x] Update tests away from Web/API assumptions.
 - [x] Validate with installed `reportlab` in the project virtual environment.
+- [x] Simplify README into a short vLLM-first run path.
+- [x] Simplify server runbook into environment -> vLLM -> install -> run -> troubleshoot.
 - [ ] Validate full report generation against the real 2x4090 local LLM API.
 
 ## Next Technical Improvements
 
+- [ ] Add ETF rotation MVP docs after the backtest module exists.
 - [ ] Add a larger configurable US equity/ETF universe file.
 - [ ] Add explicit data-source health summary to each report.
 - [ ] Add optional JSON artifact for downstream automation.
