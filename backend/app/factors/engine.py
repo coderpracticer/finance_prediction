@@ -227,6 +227,23 @@ def _fundamental_availability_factors(
                 evidence="当前未接入ETF规模、费率、跟踪指数、持仓或份额变化等产品资料。",
             )
         ]
+    if fundamentals.details:
+        detail_text = "；".join(
+            f"{label_product_metric(key)}={value}"
+            for key, value in fundamentals.details.items()
+        )
+        coverage = len(fundamentals.details)
+        score = clamp(45 + coverage * 8, 45, 90)
+        return [
+            FactorScore(
+                name="etf_product_profile",
+                group="Quality",
+                score=score,
+                confidence=0.65,
+                raw_value=coverage,
+                evidence=f"已获得ETF产品资料：{detail_text}。",
+            )
+        ]
     coverage = sum(
         [fundamentals.has_revenue, fundamentals.has_net_income, fundamentals.has_eps]
     )
@@ -241,6 +258,19 @@ def _fundamental_availability_factors(
             evidence=f"已获得 {coverage}/3 项核心产品或基本面资料。",
         )
     ]
+
+
+def label_product_metric(key: str) -> str:
+    labels = {
+        "asset_type": "资产类型",
+        "exchange": "交易所",
+        "category": "类别",
+        "tracking_index": "跟踪指数",
+        "fund_company": "基金公司",
+        "theme": "主题",
+        "risk_profile": "风险画像",
+    }
+    return labels.get(key, key)
 
 
 def aggregate_score(factors: list[FactorScore]) -> tuple[float, float, str]:

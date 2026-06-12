@@ -105,6 +105,30 @@ class ScreeningEngineTests(unittest.TestCase):
         self.assertNotIn("Nasdaq RSS", evidence_text)
         self.assertNotIn("SEC companyfacts", evidence_text)
 
+    def test_etf_product_metadata_becomes_quality_evidence(self) -> None:
+        dataset = InstrumentDataset(
+            instrument=Instrument(symbol="510300", name="沪深300ETF"),
+            prices=[
+                PriceBar(timestamp=index, close=100 + index, volume=1000 + index * 10)
+                for index in range(30)
+            ],
+            fundamentals=FundamentalSnapshot(
+                metric_count=3,
+                available_metrics=["category", "tracking_index", "theme"],
+                details={
+                    "category": "宽基",
+                    "tracking_index": "沪深300",
+                    "theme": "A股核心资产",
+                },
+            ),
+        )
+
+        factors = calculate_factors(dataset)
+        quality = next(factor for factor in factors if factor.name == "etf_product_profile")
+
+        self.assertIn("跟踪指数=沪深300", quality.evidence)
+        self.assertIn("主题=A股核心资产", quality.evidence)
+
     def test_default_risks_marks_weak_data_quality(self) -> None:
         risks = default_risks("weak", ["TEST/yahoo_chart_prices: HTTP 429"])
 

@@ -44,11 +44,28 @@
 - [x] Run syntax validation.
 - [x] Run full unit tests.
 
+## Current Task: Add News, Announcements, And ETF Product Data
+
+- [x] Add ETF product metadata fields to the instrument schema.
+- [x] Add news source and category fields to news items.
+- [x] Add generic product detail fields to the fundamental snapshot.
+- [x] Enrich the China ETF universe with asset type, exchange, category, tracking index, theme, and risk profile.
+- [x] Add config-backed ETF product metadata as a stable source.
+- [x] Add CNInfo announcement connector and parser.
+- [x] Convert ETF product metadata into a Quality factor.
+- [x] Add a news, announcement, and product-data analyst role.
+- [x] Strengthen prompts to require clear but cautious investment advice.
+- [x] Add parser, factor, and prompt tests.
+- [x] Run targeted unit tests.
+- [x] Run syntax validation.
+- [x] Run full unit tests.
+- [x] Smoke-test config loading with enriched ETF metadata.
+
 ## Next Technical Improvements
 
 - [ ] Add explicit multi-round committee orchestrator instead of simulating debate inside the synthesis prompt.
-- [ ] Add China ETF product metadata crawler for fund size, fee, tracking index, fund manager, listing date, and shares outstanding.
-- [ ] Add Chinese news, announcement, and policy event sources for ETF themes.
+- [ ] Add deeper China ETF product metadata crawler for live fund size, fee, fund manager, listing date, shares outstanding, premium/discount, and holdings.
+- [ ] Add Chinese news and policy event sources for ETF themes beyond CNInfo announcements.
 - [ ] Add a second China ETF price provider fallback, such as Tencent or Sina, if Eastmoney is rate-limited.
 - [ ] Add optional JSON report artifact for downstream automation.
 - [ ] Add retry/backoff controls for public crawler sources.

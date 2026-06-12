@@ -11,3 +11,9 @@ data/*.log
 data/raw/
 
 report/
+
+PLANS.md
+
+STATUS.md
+
+*.txt

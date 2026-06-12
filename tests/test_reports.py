@@ -69,6 +69,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("crypto_market_analyst", names)
         self.assertIn("momentum_technical_analyst", names)
         self.assertIn("news_event_analyst", names)
+        self.assertIn("news_announcement_fundamental_analyst", names)
         self.assertIn("risk_challenger", names)
         self.assertIn("portfolio_sizing_advisor", names)
         self.assertIn("compliance_guardian", names)
@@ -88,6 +89,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("合规审查", prompt)
         self.assertIn("0%-5%", prompt)
         self.assertIn("新手先看", prompt)
+        self.assertIn("明确但审慎的投资建议", prompt)
 
     def test_markdown_report_contains_ranked_table_and_notice(self) -> None:
         markdown = render_markdown_report(

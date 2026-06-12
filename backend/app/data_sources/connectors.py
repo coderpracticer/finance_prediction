@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime, timedelta
+from html import unescape
 from pathlib import Path
 from typing import Any, Callable
 
@@ -24,7 +27,11 @@ from backend.app.models.schemas import (
 )
 
 
-def _fetch(url: str, headers: dict[str, str] | None = None) -> bytes:
+def _fetch(
+    url: str,
+    headers: dict[str, str] | None = None,
+    data: bytes | None = None,
+) -> bytes:
     request_headers = {
         "User-Agent": (
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -35,7 +42,7 @@ def _fetch(url: str, headers: dict[str, str] | None = None) -> bytes:
         "Referer": "https://finance.yahoo.com/",
     }
     request_headers.update(headers or {})
-    request = urllib.request.Request(url, headers=request_headers)
+    request = urllib.request.Request(url, data=data, headers=request_headers)
     with urllib.request.urlopen(request, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
         return response.read()
 
@@ -158,6 +165,34 @@ class DataSourceClient:
             elif progress:
                 progress(f"{instrument.symbol}: no cached price snapshot found")
 
+        if source_enabled(source_config, "instrument_config_metadata"):
+            fundamentals = self.build_instrument_config_metadata(instrument)
+            if progress:
+                progress(
+                    f"{instrument.symbol}: loaded config metadata metrics="
+                    f"{fundamentals.metric_count}"
+                )
+
+        if source_enabled(source_config, "cninfo_announcements"):
+            try:
+                if progress:
+                    progress(f"{instrument.symbol}: fetching CNInfo announcements")
+                news.extend(
+                    self.fetch_cninfo_announcements(
+                        instrument,
+                        source_config["cninfo_announcements"],
+                    )
+                )
+                if progress:
+                    progress(f"{instrument.symbol}: CNInfo announcement items={len(news)}")
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(source_warning(instrument.symbol, "cninfo_announcements", exc))
+                if progress:
+                    progress(
+                        f"{instrument.symbol}: CNInfo announcements failed: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+
         if source_enabled(source_config, "nasdaq_stock_rss"):
             try:
                 if progress:
@@ -210,6 +245,26 @@ class DataSourceClient:
             news=news,
             fundamentals=fundamentals,
             warnings=warnings,
+        )
+
+    def build_instrument_config_metadata(self, instrument: Instrument) -> FundamentalSnapshot:
+        details = {
+            key: value
+            for key, value in {
+                "asset_type": instrument.asset_type,
+                "exchange": instrument.exchange,
+                "category": instrument.category,
+                "tracking_index": instrument.tracking_index,
+                "fund_company": instrument.fund_company,
+                "theme": instrument.theme,
+                "risk_profile": instrument.risk_profile,
+            }.items()
+            if value
+        }
+        return FundamentalSnapshot(
+            metric_count=len(details),
+            available_metrics=list(details.keys()),
+            details=details,
         )
 
     def fetch_eastmoney_kline_prices(
@@ -359,6 +414,41 @@ class DataSourceClient:
         payload = _fetch(url, {"User-Agent": os.getenv(user_agent_env, DEFAULT_SEC_USER_AGENT)})
         save_snapshot(self.raw_dir, "sec_companyfacts", instrument.symbol, payload, "json")
         return parse_sec_companyfacts_snapshot(payload)
+
+    def fetch_cninfo_announcements(
+        self,
+        instrument: Instrument,
+        config: dict[str, Any],
+    ) -> list[NewsItem]:
+        exchange = (instrument.exchange or "").upper()
+        column = "sse" if exchange == "SH" else "szse" if exchange == "SZ" else ""
+        form = {
+            "stock": instrument.symbol,
+            "searchkey": "",
+            "plate": "",
+            "category": "",
+            "trade": "",
+            "column": column,
+            "pageNum": "1",
+            "pageSize": str(config.get("page_size", 5)),
+            "tabName": "fulltext",
+            "sortName": "",
+            "sortType": "",
+            "limit": "",
+            "seDate": "",
+        }
+        payload = _fetch(
+            config["url"],
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": "https://www.cninfo.com.cn",
+                "Referer": "https://www.cninfo.com.cn/new/commonUrl/pageOfSearch?url=disclosure/list/search",
+            },
+            data=urllib.parse.urlencode(form).encode("utf-8"),
+        )
+        save_snapshot(self.raw_dir, "cninfo_announcements", instrument.symbol, payload, "json")
+        return parse_cninfo_announcements(payload)
 
     def fetch_nasdaq_news(self, instrument: Instrument, config: dict[str, Any]) -> list[NewsItem]:
         url = config["url_template"].format(symbol=instrument.symbol)
@@ -591,6 +681,34 @@ def parse_rss_news(root: ET.Element) -> list[NewsItem]:
     return items
 
 
+def parse_cninfo_announcements(payload: bytes) -> list[NewsItem]:
+    data = json.loads(payload.decode("utf-8"))
+    rows = data.get("announcements") or []
+    items: list[NewsItem] = []
+    for row in rows[:10]:
+        if not isinstance(row, dict):
+            continue
+        title = clean_html_text(str(row.get("announcementTitle") or "")).strip()
+        if not title:
+            continue
+        adjunct_url = row.get("adjunctUrl")
+        link = f"https://static.cninfo.com.cn/{adjunct_url}" if adjunct_url else None
+        published_at = None
+        timestamp = row.get("announcementTime")
+        if isinstance(timestamp, (int, float)):
+            published_at = datetime.fromtimestamp(timestamp / 1000, UTC).date().isoformat()
+        items.append(
+            NewsItem(
+                title=title,
+                link=link,
+                published_at=published_at,
+                source="巨潮资讯",
+                category="announcement",
+            )
+        )
+    return items
+
+
 def parse_sec_companyfacts_snapshot(payload: bytes) -> FundamentalSnapshot:
     data = json.loads(payload.decode("utf-8"))
     us_gaap = data.get("facts", {}).get("us-gaap", {})
@@ -602,6 +720,10 @@ def parse_sec_companyfacts_snapshot(payload: bytes) -> FundamentalSnapshot:
         has_net_income="NetIncomeLoss" in us_gaap,
         has_eps="EarningsPerShareDiluted" in us_gaap,
     )
+
+
+def clean_html_text(value: str) -> str:
+    return unescape(re.sub(r"<[^>]+>", "", value)).replace("\n", " ").strip()
 
 
 def parse_optional_float(value: str | None) -> float | None:

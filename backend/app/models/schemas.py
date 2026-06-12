@@ -9,6 +9,13 @@ class Instrument:
     symbol: str
     name: str
     market: str = "CN"
+    asset_type: str | None = None
+    exchange: str | None = None
+    category: str | None = None
+    tracking_index: str | None = None
+    fund_company: str | None = None
+    theme: str | None = None
+    risk_profile: str | None = None
     stooq_symbol: str | None = None
     eastmoney_secid: str | None = None
     cik: str | None = None
@@ -30,6 +37,8 @@ class NewsItem:
     link: str | None = None
     published_at: str | None = None
     summary: str | None = None
+    source: str | None = None
+    category: str | None = None
 
 
 @dataclass
@@ -39,6 +48,7 @@ class FundamentalSnapshot:
     has_revenue: bool = False
     has_net_income: bool = False
     has_eps: bool = False
+    details: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

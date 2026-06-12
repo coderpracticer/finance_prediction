@@ -9,6 +9,7 @@ from backend.app.data_sources.spike import (
 )
 from backend.app.data_sources.connectors import (
     parse_eastmoney_kline_prices,
+    parse_cninfo_announcements,
     parse_date_timestamp,
     parse_local_price_csv,
     parse_nasdaq_historical_prices,
@@ -176,6 +177,27 @@ class DataSourceSpikeTests(unittest.TestCase):
         self.assertEqual(len(prices), 2)
         self.assertEqual(prices[-1].close, 3.2)
         self.assertEqual(prices[-1].volume, 120000)
+
+    def test_parse_cninfo_announcements_returns_news_items(self) -> None:
+        payload = json.dumps(
+            {
+                "announcements": [
+                    {
+                        "announcementTitle": "沪深300ETF<em>基金</em>份额变动公告",
+                        "adjunctUrl": "finalpage/2026-06-12/test.PDF",
+                        "announcementTime": 1781193600000,
+                    }
+                ]
+            }
+        ).encode("utf-8")
+
+        items = parse_cninfo_announcements(payload)
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].title, "沪深300ETF基金份额变动公告")
+        self.assertEqual(items[0].source, "巨潮资讯")
+        self.assertEqual(items[0].category, "announcement")
+        self.assertIn("static.cninfo.com.cn", items[0].link or "")
 
     def test_resolve_eastmoney_secid_handles_cn_etfs(self) -> None:
         self.assertEqual(
