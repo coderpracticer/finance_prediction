@@ -29,6 +29,25 @@
   - `risk_challenger`
   - `opportunity_scout`
   - `final_research_writer`
+- Added professional investment team prompt design:
+  - `docs/professional-investment-team-prompts-v1.md`
+- Upgraded prompt-only team roles for:
+  - macro and cross-asset strategy
+  - A-share equity analysis
+  - China ETF rotation
+  - fixed income and FX
+  - commodities
+  - Crypto
+  - news and events
+  - risk challenge
+  - portfolio sizing
+  - compliance review
+- Added investment committee style synthesis requirements:
+  - rating
+  - suggested action
+  - sizing range
+  - first failure condition
+  - ordinary-investor disclaimer
 - Rewrote corrupted Chinese prompt/documentation text.
 - Simplified run docs:
   - `README.md`
@@ -44,7 +63,8 @@
 1. On the Linux server, generate a new report:
    - `python -m backend.app.cli generate-report --top-n 10`
 2. Inspect whether `Data Source Health` shows enough price coverage.
-3. If Eastmoney is rate-limited on the server, add a second China price provider fallback.
+3. Check whether the generated report now includes investment committee rating, action, sizing, risk, and disclaimer.
+4. If Eastmoney is rate-limited on the server, add a second China price provider fallback.
 
 ## Blockers
 
@@ -53,6 +73,7 @@
 
 ## Validation Results
 
+- `.\.venv\Scripts\python.exe -m unittest tests.test_reports`: 8 tests passed.
 - `.\.venv\Scripts\python.exe -m unittest discover -s tests`: 25 tests passed.
 - `.\.venv\Scripts\python.exe -m compileall backend`: passed.
 - Default config smoke test loaded `configs/china_etf_rotation.json` with 15 CN instruments.

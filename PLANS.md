@@ -18,8 +18,20 @@
 - [x] Run syntax validation.
 - [x] Smoke-test live Eastmoney price fetch for one China ETF.
 
+## Current Task: Upgrade To Professional Investment Team Prompts
+
+- [x] Write v1 professional investment team prompt design document.
+- [x] Expand agent roles from lightweight ETF rotation roles to professional investment team roles.
+- [x] Add investment committee style synthesis requirements.
+- [x] Add ordinary-investor compliance, disclaimer, rating, action, sizing, and first-failure-condition requirements.
+- [x] Update final writer system prompt.
+- [x] Update prompt tests.
+- [x] Run targeted unit tests.
+- [x] Run syntax validation.
+
 ## Next Technical Improvements
 
+- [ ] Add explicit multi-round committee orchestrator instead of simulating debate inside the synthesis prompt.
 - [ ] Add a second China ETF price provider fallback, such as Tencent or Sina, if Eastmoney is rate-limited.
 - [ ] Add ETF metadata crawler for fund size, tracking index, fee, and listing date.
 - [ ] Add optional JSON report artifact for downstream automation.

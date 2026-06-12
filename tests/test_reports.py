@@ -49,17 +49,27 @@ class ReportTests(unittest.TestCase):
         self.assertIn("510300", prompt)
         self.assertIn("第一否定条件", prompt)
         self.assertIn("数据质量审计智能体", prompt)
-        self.assertIn("中国ETF风格轮动智能体", prompt)
-        self.assertIn("不做美股个股预测", prompt)
+        self.assertIn("中国 ETF 风格轮动智能体", prompt)
+        self.assertIn("投资委员会评级", prompt)
+        self.assertIn("仓位区间", prompt)
+        self.assertIn("不构成个性化投资建议", prompt)
 
-    def test_agent_prompts_define_lightweight_roles(self) -> None:
+    def test_agent_prompts_define_professional_investment_team_roles(self) -> None:
         prompts = build_agent_prompts(sample_screening(), ("short", "medium"))
         names = {prompt.name for prompt in prompts}
 
         self.assertIn("data_quality_auditor", names)
+        self.assertIn("macro_cross_asset_strategist", names)
+        self.assertIn("a_share_equity_analyst", names)
         self.assertIn("china_etf_style_rotation_analyst", names)
+        self.assertIn("fixed_income_fx_analyst", names)
+        self.assertIn("commodity_analyst", names)
+        self.assertIn("crypto_market_analyst", names)
         self.assertIn("momentum_technical_analyst", names)
+        self.assertIn("news_event_analyst", names)
         self.assertIn("risk_challenger", names)
+        self.assertIn("portfolio_sizing_advisor", names)
+        self.assertIn("compliance_guardian", names)
         self.assertIn("opportunity_scout", names)
 
     def test_synthesis_prompt_includes_agent_outputs(self) -> None:
@@ -72,6 +82,9 @@ class ReportTests(unittest.TestCase):
         self.assertIn("多智能体中间结论", prompt)
         self.assertIn("risk_challenger", prompt)
         self.assertIn("主要风险是价格数据缺口。", prompt)
+        self.assertIn("投资委员会主席", prompt)
+        self.assertIn("合规审查", prompt)
+        self.assertIn("0%-5%", prompt)
 
     def test_markdown_report_contains_ranked_table_and_notice(self) -> None:
         markdown = render_markdown_report(
