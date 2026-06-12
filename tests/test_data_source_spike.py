@@ -8,6 +8,7 @@ from backend.app.data_sources.spike import (
     status_from,
 )
 from backend.app.data_sources.connectors import (
+    build_cninfo_query_forms,
     parse_eastmoney_kline_prices,
     parse_cninfo_announcements,
     parse_date_timestamp,
@@ -198,6 +199,22 @@ class DataSourceSpikeTests(unittest.TestCase):
         self.assertEqual(items[0].source, "巨潮资讯")
         self.assertEqual(items[0].category, "announcement")
         self.assertIn("static.cninfo.com.cn", items[0].link or "")
+
+    def test_build_cninfo_query_forms_includes_fund_search_fallbacks(self) -> None:
+        forms = build_cninfo_query_forms(
+            Instrument(
+                symbol="510300",
+                name="沪深300ETF",
+                exchange="SH",
+                tracking_index="沪深300",
+            ),
+            page_size=5,
+        )
+
+        self.assertGreaterEqual(len(forms), 4)
+        self.assertEqual(forms[0]["stock"], "510300")
+        self.assertTrue(any(form["searchkey"] == "沪深300ETF" for form in forms))
+        self.assertTrue(any(form["column"] == "fund" for form in forms))
 
     def test_resolve_eastmoney_secid_handles_cn_etfs(self) -> None:
         self.assertEqual(

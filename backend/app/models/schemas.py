@@ -15,6 +15,7 @@ class Instrument:
     tracking_index: str | None = None
     fund_company: str | None = None
     theme: str | None = None
+    policy_watch: str | None = None
     risk_profile: str | None = None
     stooq_symbol: str | None = None
     eastmoney_secid: str | None = None

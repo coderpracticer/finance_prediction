@@ -9,6 +9,7 @@
       "category": "宽基",
       "tracking_index": "上证50",
       "theme": "大盘蓝筹",
+      "policy_watch": "稳增长政策、金融地产信用风险、外资风险偏好",
       "risk_profile": "偏低到中等，集中于大盘金融和消费蓝筹",
       "eastmoney_secid": "1.510050"
     },
@@ -21,6 +22,7 @@
       "category": "宽基",
       "tracking_index": "沪深300",
       "theme": "A股核心资产",
+      "policy_watch": "宏观经济预期、外资流向、宽基估值水平",
       "risk_profile": "中等，代表大盘均衡权益暴露",
       "eastmoney_secid": "1.510300"
     },
@@ -33,6 +35,7 @@
       "category": "宽基",
       "tracking_index": "中证500",
       "theme": "中盘成长与制造业",
+      "policy_watch": "制造业景气、信用环境、中盘股风险偏好",
       "risk_profile": "中高，波动通常高于大盘宽基",
       "eastmoney_secid": "1.510500"
     },
@@ -45,6 +48,7 @@
       "category": "宽基/成长",
       "tracking_index": "创业板指",
       "theme": "成长股和创新产业",
+      "policy_watch": "成长股流动性、科技政策、创业板盈利修复",
       "risk_profile": "较高，对成长股估值和流动性敏感",
       "eastmoney_secid": "0.159915"
     },
@@ -57,6 +61,7 @@
       "category": "宽基/小盘",
       "tracking_index": "中证1000",
       "theme": "小盘成长与弹性资产",
+      "policy_watch": "小盘流动性、量化交易拥挤度、风险偏好变化",
       "risk_profile": "较高，适合作为卫星仓观察",
       "eastmoney_secid": "1.512100"
     },
@@ -69,6 +74,7 @@
       "category": "策略",
       "tracking_index": "红利指数",
       "theme": "高股息和防御收益",
+      "policy_watch": "利率趋势、高股息拥挤度、分红政策稳定性",
       "risk_profile": "中等偏低，但受利率和高股息拥挤度影响",
       "eastmoney_secid": "1.510880"
     },
@@ -81,6 +87,7 @@
       "category": "行业",
       "tracking_index": "银行主题指数",
       "theme": "银行和高股息金融",
+      "policy_watch": "MLF/LPR利率、净息差、地产信用和银行资产质量",
       "risk_profile": "中等偏低，但受利率、息差和地产信用周期影响",
       "eastmoney_secid": "1.512800"
     },
@@ -93,6 +100,7 @@
       "category": "行业主题",
       "tracking_index": "军工主题指数",
       "theme": "国防军工",
+      "policy_watch": "军费预算、订单节奏、国企改革和主题交易热度",
       "risk_profile": "较高，受订单周期、政策预期和主题交易影响",
       "eastmoney_secid": "1.512660"
     },
@@ -105,6 +113,7 @@
       "category": "行业主题",
       "tracking_index": "光伏产业指数",
       "theme": "新能源和光伏产业链",
+      "policy_watch": "硅料价格、产能出清、海外需求和补贴政策",
       "risk_profile": "高，受产能周期、价格战和政策补贴影响",
       "eastmoney_secid": "1.515790"
     },
@@ -117,6 +126,7 @@
       "category": "行业主题",
       "tracking_index": "新能源车主题指数",
       "theme": "新能源汽车产业链",
+      "policy_watch": "销量、价格战、电池材料价格和产业政策",
       "risk_profile": "高，受销量、价格战、电池材料和政策影响",
       "eastmoney_secid": "1.515030"
     },
@@ -129,6 +139,7 @@
       "category": "行业主题",
       "tracking_index": "芯片产业指数",
       "theme": "半导体国产替代",
+      "policy_watch": "国产替代政策、半导体库存周期、AI算力需求",
       "risk_profile": "高，受景气周期、估值和政策预期影响",
       "eastmoney_secid": "1.512760"
     },
@@ -141,6 +152,7 @@
       "category": "行业主题",
       "tracking_index": "医疗主题指数",
       "theme": "医疗服务、器械和创新药",
+      "policy_watch": "集采政策、医保控费、创新药审批和行业业绩修复",
       "risk_profile": "中高，受政策控费、集采和行业景气影响",
       "eastmoney_secid": "1.512170"
     },
@@ -153,6 +165,7 @@
       "category": "行业主题",
       "tracking_index": "酒类消费主题指数",
       "theme": "白酒和食品饮料消费",
+      "policy_watch": "消费复苏、渠道库存、价格带变化和节假日需求",
       "risk_profile": "中高，受消费景气、估值和渠道库存影响",
       "eastmoney_secid": "1.512690"
     },
@@ -165,6 +178,7 @@
       "category": "商品",
       "tracking_index": "黄金现货价格",
       "theme": "黄金避险和抗通胀",
+      "policy_watch": "美元指数、实际利率、地缘风险和央行购金",
       "risk_profile": "中等，受美元、实际利率和避险情绪影响",
       "eastmoney_secid": "1.518880"
     },
@@ -177,6 +191,7 @@
       "category": "跨境",
       "tracking_index": "纳斯达克100",
       "theme": "美股科技成长",
+      "policy_watch": "美元指数、美国利率、海外科技股盈利和跨境溢价",
       "risk_profile": "较高，受海外科技股、汇率和跨境溢价影响",
       "eastmoney_secid": "1.513100"
     }
@@ -186,6 +201,11 @@
       "enabled": true,
       "category": "fundamentals",
       "description": "Use ETF product metadata embedded in the configured universe."
+    },
+    "instrument_research_context": {
+      "enabled": true,
+      "category": "news",
+      "description": "Use configured ETF theme and policy watch items as non-price research context."
     },
     "cninfo_announcements": {
       "enabled": true,

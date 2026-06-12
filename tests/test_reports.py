@@ -55,6 +55,9 @@ class ReportTests(unittest.TestCase):
         self.assertIn("不构成个性化投资建议", prompt)
         self.assertIn("新手投资者", prompt)
         self.assertIn("术语解释", prompt)
+        self.assertIn("ETF 是交易型开放式指数基金", prompt)
+        self.assertIn("趋势失效", prompt)
+        self.assertIn("事件/公告失效", prompt)
 
     def test_agent_prompts_define_professional_investment_team_roles(self) -> None:
         prompts = build_agent_prompts(sample_screening(), ("short", "medium"))
@@ -100,6 +103,10 @@ class ReportTests(unittest.TestCase):
 
         self.assertIn("# 中国ETF专业投资研究报告", markdown)
         self.assertIn("## 新手阅读指南", markdown)
+        self.assertIn("## ETF入门说明", markdown)
+        self.assertIn("ETF，中文常称“交易型开放式指数基金”", markdown)
+        self.assertIn("## 投资建议口径", markdown)
+        self.assertIn("完整术语表", markdown)
         self.assertIn("| 1 | 510300 | 沪深300ETF |", markdown)
         self.assertIn("## 技术附录：因子证据表", markdown)
         self.assertIn("结构化证据", markdown)

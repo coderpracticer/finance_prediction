@@ -173,6 +173,15 @@ class DataSourceClient:
                     f"{fundamentals.metric_count}"
                 )
 
+        if source_enabled(source_config, "instrument_research_context"):
+            context_items = self.build_instrument_research_context(instrument)
+            news.extend(context_items)
+            if progress:
+                progress(
+                    f"{instrument.symbol}: loaded configured research context "
+                    f"items={len(context_items)}"
+                )
+
         if source_enabled(source_config, "cninfo_announcements"):
             try:
                 if progress:
@@ -257,6 +266,7 @@ class DataSourceClient:
                 "tracking_index": instrument.tracking_index,
                 "fund_company": instrument.fund_company,
                 "theme": instrument.theme,
+                "policy_watch": instrument.policy_watch,
                 "risk_profile": instrument.risk_profile,
             }.items()
             if value
@@ -266,6 +276,30 @@ class DataSourceClient:
             available_metrics=list(details.keys()),
             details=details,
         )
+
+    def build_instrument_research_context(self, instrument: Instrument) -> list[NewsItem]:
+        if not any([instrument.theme, instrument.tracking_index, instrument.policy_watch]):
+            return []
+        title = f"{instrument.name}研究上下文：{instrument.theme or instrument.tracking_index}"
+        summary_parts = [
+            "这是系统配置的非价格研究线索，不是实时新闻或公告。",
+        ]
+        if instrument.tracking_index:
+            summary_parts.append(f"跟踪指数：{instrument.tracking_index}。")
+        if instrument.theme:
+            summary_parts.append(f"主题定位：{instrument.theme}。")
+        if instrument.policy_watch:
+            summary_parts.append(f"后续重点观察：{instrument.policy_watch}。")
+        if instrument.risk_profile:
+            summary_parts.append(f"风险画像：{instrument.risk_profile}。")
+        return [
+            NewsItem(
+                title=title,
+                summary="".join(summary_parts),
+                source="配置研究上下文",
+                category="research_context",
+            )
+        ]
 
     def fetch_eastmoney_kline_prices(
         self,
@@ -420,25 +454,36 @@ class DataSourceClient:
         instrument: Instrument,
         config: dict[str, Any],
     ) -> list[NewsItem]:
-        exchange = (instrument.exchange or "").upper()
-        column = "sse" if exchange == "SH" else "szse" if exchange == "SZ" else ""
-        form = {
-            "stock": instrument.symbol,
-            "searchkey": "",
-            "plate": "",
-            "category": "",
-            "trade": "",
-            "column": column,
-            "pageNum": "1",
-            "pageSize": str(config.get("page_size", 5)),
-            "tabName": "fulltext",
-            "sortName": "",
-            "sortType": "",
-            "limit": "",
-            "seDate": "",
-        }
-        payload = _fetch(
-            config["url"],
+        items: list[NewsItem] = []
+        combined_payloads: list[dict[str, Any]] = []
+        last_error: Exception | None = None
+        for form in build_cninfo_query_forms(instrument, int(config.get("page_size", 5))):
+            try:
+                payload = self.fetch_cninfo_form(config["url"], form)
+                combined_payloads.append(
+                    {
+                        "form": form,
+                        "payload": json.loads(payload.decode("utf-8")),
+                    }
+                )
+                items.extend(parse_cninfo_announcements(payload))
+            except Exception as exc:  # noqa: BLE001 - try the remaining query shapes.
+                last_error = exc
+        if combined_payloads:
+            save_snapshot(
+                self.raw_dir,
+                "cninfo_announcements",
+                instrument.symbol,
+                json.dumps(combined_payloads, ensure_ascii=False).encode("utf-8"),
+                "json",
+            )
+        elif last_error is not None:
+            raise last_error
+        return dedupe_news_items(items)[: int(config.get("page_size", 5))]
+
+    def fetch_cninfo_form(self, url: str, form: dict[str, str]) -> bytes:
+        return _fetch(
+            url,
             headers={
                 "Accept": "application/json, text/plain, */*",
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -447,8 +492,6 @@ class DataSourceClient:
             },
             data=urllib.parse.urlencode(form).encode("utf-8"),
         )
-        save_snapshot(self.raw_dir, "cninfo_announcements", instrument.symbol, payload, "json")
-        return parse_cninfo_announcements(payload)
 
     def fetch_nasdaq_news(self, instrument: Instrument, config: dict[str, Any]) -> list[NewsItem]:
         url = config["url_template"].format(symbol=instrument.symbol)
@@ -512,6 +555,49 @@ class DataSourceClient:
         if self.raw_dir.parent.name == "raw" and self.raw_dir.parent.exists():
             roots.extend(path for path in self.raw_dir.parent.iterdir() if path.is_dir())
         return list(dict.fromkeys(roots))
+
+
+def build_cninfo_query_forms(instrument: Instrument, page_size: int) -> list[dict[str, str]]:
+    exchange = (instrument.exchange or "").upper()
+    column = "sse" if exchange == "SH" else "szse" if exchange == "SZ" else ""
+    base = {
+        "stock": instrument.symbol,
+        "searchkey": "",
+        "plate": "",
+        "category": "",
+        "trade": "",
+        "column": column,
+        "pageNum": "1",
+        "pageSize": str(page_size),
+        "tabName": "fulltext",
+        "sortName": "",
+        "sortType": "",
+        "limit": "",
+        "seDate": "",
+    }
+    forms = [base]
+    for searchkey, search_column in (
+        (instrument.symbol, "fund"),
+        (instrument.name, "fund"),
+        (instrument.tracking_index or "", "fund"),
+        (instrument.name, ""),
+    ):
+        if not searchkey:
+            continue
+        form = dict(base)
+        form["stock"] = ""
+        form["searchkey"] = searchkey
+        form["column"] = search_column
+        forms.append(form)
+    unique_forms: list[dict[str, str]] = []
+    seen: set[tuple[tuple[str, str], ...]] = set()
+    for form in forms:
+        key = tuple(sorted(form.items()))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_forms.append(form)
+    return unique_forms
 
 
 def _list_get(values: list[Any] | None, index: int) -> Any:
@@ -707,6 +793,18 @@ def parse_cninfo_announcements(payload: bytes) -> list[NewsItem]:
             )
         )
     return items
+
+
+def dedupe_news_items(items: list[NewsItem]) -> list[NewsItem]:
+    deduped: list[NewsItem] = []
+    seen: set[tuple[str, str | None]] = set()
+    for item in items:
+        key = (item.title, item.link)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
 
 
 def parse_sec_companyfacts_snapshot(payload: bytes) -> FundamentalSnapshot:

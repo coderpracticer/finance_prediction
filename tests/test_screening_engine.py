@@ -129,6 +129,30 @@ class ScreeningEngineTests(unittest.TestCase):
         self.assertIn("跟踪指数=沪深300", quality.evidence)
         self.assertIn("主题=A股核心资产", quality.evidence)
 
+    def test_research_context_is_not_treated_as_real_time_announcement(self) -> None:
+        dataset = InstrumentDataset(
+            instrument=Instrument(symbol="510300", name="沪深300ETF"),
+            prices=[
+                PriceBar(timestamp=index, close=100 + index, volume=1000 + index * 10)
+                for index in range(30)
+            ],
+            news=[
+                NewsItem(
+                    title="沪深300ETF研究上下文：A股核心资产",
+                    source="配置研究上下文",
+                    category="research_context",
+                )
+            ],
+        )
+
+        event_factor = next(
+            factor for factor in calculate_factors(dataset)
+            if factor.name == "news_attention"
+        )
+
+        self.assertIn("配置研究上下文", event_factor.evidence)
+        self.assertIn("不能替代实时事件验证", event_factor.evidence)
+
     def test_default_risks_marks_weak_data_quality(self) -> None:
         risks = default_risks("weak", ["TEST/yahoo_chart_prices: HTTP 429"])
 

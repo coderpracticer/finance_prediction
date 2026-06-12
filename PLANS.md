@@ -52,6 +52,9 @@
 - [x] Enrich the China ETF universe with asset type, exchange, category, tracking index, theme, and risk profile.
 - [x] Add config-backed ETF product metadata as a stable source.
 - [x] Add CNInfo announcement connector and parser.
+- [x] Add multiple CNInfo query fallbacks by code, ETF name, tracking index, and fund search column.
+- [x] Add configured non-price research context for ETF themes and policy watch items.
+- [x] Keep configured research context separate from real-time news or announcements.
 - [x] Convert ETF product metadata into a Quality factor.
 - [x] Add a news, announcement, and product-data analyst role.
 - [x] Strengthen prompts to require clear but cautious investment advice.
@@ -60,6 +63,18 @@
 - [x] Run syntax validation.
 - [x] Run full unit tests.
 - [x] Smoke-test config loading with enriched ETF metadata.
+
+## Current Task: Complete Beginner Terminology And Advice Rules
+
+- [x] Add ETF beginner explanation to the rendered report.
+- [x] Add investment advice interpretation section.
+- [x] Expand glossary for ETF, tracking index, broad-based ETF, thematic ETF, cross-border ETF, position sizing, stop-loss, premium/discount, and liquidity.
+- [x] Require final reports to explain what each ETF tracks and why ETF differs from a single stock.
+- [x] Require four types of failure conditions: trend, risk, event/announcement, and data failure.
+- [x] Prevent one-size-fits-all mechanical failure rules in prompts.
+- [x] Add tests for CNInfo fallback forms, ETF beginner explanation, and research-context handling.
+- [x] Run targeted unit tests.
+- [x] Run full unit tests.
 
 ## Next Technical Improvements
 

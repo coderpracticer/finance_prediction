@@ -33,7 +33,7 @@ def _data_coverage_factors(
             confidence=0.9,
             raw_value=len(prices),
             evidence=(
-                f"价格序列={len(prices)}条，新闻/公告线索={len(news)}条，"
+                f"价格序列={len(prices)}条，新闻/公告/研究线索={len(news)}条，"
                 f"产品或基本面资料={'有' if fundamentals is not None else '暂无'}。"
             ),
         )
@@ -197,9 +197,24 @@ def _event_factors(news: list[NewsItem]) -> list[FactorScore]:
     count = len(news)
     score = clamp(35 + count * 4, 0, 100)
     confidence = 0.75 if count else 0.3
-    titles = [item.title for item in news[:3] if item.title]
+    real_event_items = [
+        item for item in news
+        if item.category in {None, "announcement", "news", "policy"}
+    ]
+    context_items = [item for item in news if item.category == "research_context"]
+    titles = [item.title for item in real_event_items[:3] if item.title]
     if titles:
-        evidence = f"发现{count}条近期新闻/公告线索，样例标题：" + " | ".join(titles)
+        evidence = f"发现{len(real_event_items)}条近期新闻/公告/政策线索，样例标题：" + " | ".join(titles)
+        if context_items:
+            evidence += f"；另有{len(context_items)}条配置研究上下文。"
+    elif context_items:
+        score = 42
+        confidence = 0.45
+        evidence = (
+            f"当前未抓到实时新闻或公告，但有{len(context_items)}条配置研究上下文："
+            + " | ".join(item.title for item in context_items[:3])
+            + "。这些线索只能提示后续观察方向，不能替代实时事件验证。"
+        )
     else:
         evidence = "当前未接入或未抓到可用的中文新闻、公告或政策线索。"
     return [

@@ -72,6 +72,10 @@
   - config-backed ETF product metadata source
   - CNInfo announcement connector and parser
   - generic product detail storage in `FundamentalSnapshot`
+- Strengthened non-price data retrieval:
+  - CNInfo now tries multiple query forms by symbol, ETF name, tracking index, and fund column
+  - configured ETF research context now adds theme and policy-watch lines as non-price research context
+  - configured context is explicitly marked as not real-time news or announcement evidence
 - Added ETF product metadata as a Quality factor, including category, tracking index, theme, and risk profile.
 - Added `news_announcement_fundamental_analyst` for news, announcements, and ETF product data.
 - Strengthened prompts to require clear but cautious investment advice:
@@ -80,6 +84,12 @@
   - sizing range
   - entry precondition
   - exit condition
+- Added beginner education and advice-rule improvements:
+  - ETF beginner explanation
+  - investment advice interpretation section
+  - expanded glossary
+  - four failure-condition categories: trend, risk, event/announcement, and data failure
+  - prompt guard against one-size-fits-all mechanical stop rules
 - Rewrote corrupted Chinese prompt/documentation text.
 - Simplified run docs:
   - `README.md`
@@ -99,7 +109,9 @@
    - beginner reading guide
    - longer and clearer ETF explanations
    - ETF product profile evidence such as category, tracking index, theme, and risk profile
+   - configured research context for ETF theme and policy-watch items
    - CNInfo announcement evidence if announcements are returned by the source
+   - ETF beginner explanation and expanded glossary
    - investment committee rating
    - action and sizing
    - risk and first failure condition
@@ -119,10 +131,12 @@
 - `.\.venv\Scripts\python.exe -m unittest tests.test_reports`: 8 tests passed.
 - `.\.venv\Scripts\python.exe -m unittest tests.test_reports tests.test_screening_engine`: 14 tests passed.
 - `.\.venv\Scripts\python.exe -m unittest tests.test_data_source_spike tests.test_screening_engine tests.test_reports`: 26 tests passed.
-- `.\.venv\Scripts\python.exe -m unittest discover -s tests`: 28 tests passed.
+- `.\.venv\Scripts\python.exe -m unittest tests.test_data_source_spike tests.test_screening_engine tests.test_reports`: 28 tests passed.
+- `.\.venv\Scripts\python.exe -m unittest discover -s tests`: 30 tests passed.
 - `.\.venv\Scripts\python.exe -m compileall backend`: passed.
 - Default config smoke test loaded `configs/china_etf_rotation.json` with 15 CN instruments.
 - Enriched config smoke test loaded 15 CN instruments and confirmed ETF metadata fields.
+- Research-context smoke test confirmed configured policy-watch items are generated as non-price research context.
 - Live Eastmoney smoke test fetched `510050` with 2535 daily price rows.
 
 ## Answer To Current Data-Source Question
