@@ -33,7 +33,13 @@ class ReportPipeline:
         progress: Callable[[str], None] | None = None,
     ) -> ReportArtifacts:
         report_progress = progress or (lambda _message: None)
-        report_progress(f"start screening; top_n={top_n}")
+        report_progress(
+            "start screening; "
+            f"top_n={top_n}; "
+            f"config={self.settings.config_path}; "
+            f"raw_dir={self.settings.raw_dir}; "
+            f"report_dir={output_dir or self.settings.report_dir}"
+        )
         screening = ScreeningService(self.settings).run(limit=top_n, progress=report_progress)
         if not screening.candidates:
             raise RuntimeError("No candidates were generated. Check data source connectivity.")

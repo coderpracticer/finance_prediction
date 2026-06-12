@@ -48,6 +48,11 @@
   - sizing range
   - first failure condition
   - ordinary-investor disclaimer
+- Diagnosed a generated report under `report/2026-06-12` that used the old US data-source universe:
+  - report candidates were AAPL/MSFT/SPY/NVDA-style US symbols
+  - warnings referenced Yahoo, Nasdaq, SEC, and Alpha Vantage
+  - this matches `configs/data_source_spike.json`, not `configs/china_etf_rotation.json`
+- Added runtime progress logging for active config, raw directory, report directory, and universe sample.
 - Rewrote corrupted Chinese prompt/documentation text.
 - Simplified run docs:
   - `README.md`
@@ -64,7 +69,10 @@
    - `python -m backend.app.cli generate-report --top-n 10`
 2. Inspect whether `Data Source Health` shows enough price coverage.
 3. Check whether the generated report now includes investment committee rating, action, sizing, risk, and disclaimer.
-4. If Eastmoney is rate-limited on the server, add a second China price provider fallback.
+4. Confirm startup logs show:
+   - `config=configs/china_etf_rotation.json`
+   - `sample=[510050:CN, 510300:CN, ...]`
+5. If Eastmoney is rate-limited on the server, add a second China price provider fallback.
 
 ## Blockers
 

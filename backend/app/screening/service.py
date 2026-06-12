@@ -30,7 +30,12 @@ class ScreeningService:
         sufficient_price_count = 0
         report_progress = progress or (lambda _message: None)
         universe = self.data_sources.universe()
-        report_progress(f"loaded universe; instruments={len(universe)}")
+        universe_sample = ", ".join(
+            f"{instrument.symbol}:{instrument.market}" for instrument in universe[:5]
+        )
+        report_progress(
+            f"loaded universe; instruments={len(universe)}; sample=[{universe_sample}]"
+        )
         for index, instrument in enumerate(universe, start=1):
             report_progress(f"[{index}/{len(universe)}] fetching {instrument.symbol}")
             try:
