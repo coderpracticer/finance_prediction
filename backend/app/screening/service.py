@@ -13,7 +13,11 @@ from backend.app.storage.repository import ResearchRepository
 class ScreeningService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.data_sources = DataSourceClient(settings.config_path, settings.raw_dir)
+        self.data_sources = DataSourceClient(
+            settings.config_path,
+            settings.raw_dir,
+            price_csv_dir=settings.price_csv_dir,
+        )
         self.repository = ResearchRepository(settings.database_path)
 
     def run(
@@ -23,6 +27,7 @@ class ScreeningService:
     ) -> ScreeningResponse:
         candidates: list[Candidate] = []
         warnings: list[str] = []
+        sufficient_price_count = 0
         report_progress = progress or (lambda _message: None)
         universe = self.data_sources.universe()
         report_progress(f"loaded universe; instruments={len(universe)}")
@@ -30,6 +35,8 @@ class ScreeningService:
             report_progress(f"[{index}/{len(universe)}] fetching {instrument.symbol}")
             try:
                 dataset = self.data_sources.fetch_dataset(instrument, progress=report_progress)
+                if len(dataset.prices) >= self.settings.min_price_rows:
+                    sufficient_price_count += 1
                 warnings.extend(dataset.warnings)
                 report_progress(
                     f"[{index}/{len(universe)}] calculating factors for {instrument.symbol}; "
@@ -63,6 +70,11 @@ class ScreeningService:
                     f"{type(exc).__name__}: {exc}"
                 )
 
+        self._enforce_price_coverage(
+            sufficient_price_count=sufficient_price_count,
+            universe_count=len(universe),
+        )
+
         candidates.sort(key=lambda candidate: candidate.opportunity_score, reverse=True)
         for index, candidate in enumerate(candidates[:limit], start=1):
             candidate.rank = index
@@ -78,6 +90,24 @@ class ScreeningService:
 
     def latest(self) -> ScreeningResponse | None:
         return self.repository.get_latest_screening_response()
+
+    def _enforce_price_coverage(self, sufficient_price_count: int, universe_count: int) -> None:
+        if not self.settings.require_price_history:
+            return
+        if universe_count <= 0:
+            return
+        coverage_ratio = sufficient_price_count / universe_count
+        if coverage_ratio < self.settings.min_price_coverage_ratio:
+            required = self.settings.min_price_coverage_ratio * 100
+            actual = coverage_ratio * 100
+            raise RuntimeError(
+                "Price history coverage gate failed: "
+                f"{sufficient_price_count}/{universe_count} instruments have at least "
+                f"{self.settings.min_price_rows} price rows "
+                f"({actual:.1f}% < required {required:.1f}%). "
+                "Fix price data sources, set FRA_PRICE_CSV_DIR, or rerun with "
+                "--allow-weak-price-data for diagnostics only."
+            )
 
 
 def build_evidence_summary(factors: list[FactorScore]) -> str:

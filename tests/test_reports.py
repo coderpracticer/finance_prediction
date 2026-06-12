@@ -49,6 +49,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("AAPL", prompt)
         self.assertIn("第一否定条件", prompt)
         self.assertIn("数据质量审计智能体", prompt)
+        self.assertIn("角色边界", prompt)
 
     def test_agent_prompts_define_lightweight_roles(self) -> None:
         prompts = build_agent_prompts(sample_screening(), ("short", "medium"))
@@ -93,6 +94,15 @@ class ReportTests(unittest.TestCase):
 
         self.assertEqual(args.top_n, 10)
         self.assertEqual(args.horizons, "short,medium")
+
+    def test_cli_supports_price_data_gate_options(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["generate-report", "--price-csv-dir", "data/prices", "--allow-weak-price-data"]
+        )
+
+        self.assertEqual(str(args.price_csv_dir), "data\\prices")
+        self.assertTrue(args.allow_weak_price_data)
 
     def test_pdf_renderer_creates_file_when_reportlab_is_available(self) -> None:
         try:

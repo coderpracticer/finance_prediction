@@ -5,6 +5,7 @@ import os
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
@@ -39,10 +40,20 @@ def _fetch(url: str, headers: dict[str, str] | None = None) -> bytes:
         return response.read()
 
 
+class SkipPriceNetworkFetch(Exception):
+    """Used internally when a higher-priority local price source already succeeded."""
+
+
 class DataSourceClient:
-    def __init__(self, config_path: Path, raw_dir: Path) -> None:
+    def __init__(
+        self,
+        config_path: Path,
+        raw_dir: Path,
+        price_csv_dir: Path | None = None,
+    ) -> None:
         self.config = load_config(config_path)
         self.raw_dir = raw_dir
+        self.price_csv_dir = price_csv_dir
 
     def universe(self) -> list[Instrument]:
         return [Instrument(**item) for item in self.config["universe"]]
@@ -58,29 +69,59 @@ class DataSourceClient:
         news: list[NewsItem] = []
         fundamentals = None
 
+        local_prices = self.load_local_csv_prices(instrument)
+        if local_prices is not None:
+            prices, csv_path = local_prices
+            warnings.append(f"{instrument.symbol}/price_local_csv: using {csv_path}")
+            if progress:
+                progress(
+                    f"{instrument.symbol}: using local CSV price rows={len(prices)} from {csv_path}"
+                )
+
         try:
+            if prices:
+                raise SkipPriceNetworkFetch()
+            if not source_enabled(source_config, "yahoo_chart_prices"):
+                raise RuntimeError("yahoo_chart_prices is disabled.")
             if progress:
                 progress(f"{instrument.symbol}: fetching Yahoo prices")
             prices = self.fetch_yahoo_prices(instrument, source_config["yahoo_chart_prices"])
             if progress:
                 progress(f"{instrument.symbol}: Yahoo prices rows={len(prices)}")
+        except SkipPriceNetworkFetch:
+            pass
         except Exception as exc:  # noqa: BLE001 - keep other sources usable.
             warnings.append(source_warning(instrument.symbol, "yahoo_chart_prices", exc))
             if progress:
                 progress(f"{instrument.symbol}: Yahoo prices failed; trying fallback")
             try:
-                if progress:
-                    progress(f"{instrument.symbol}: fetching Alpha Vantage prices")
-                prices = self.fetch_alpha_vantage_prices(
-                    instrument,
-                    source_config["alpha_vantage_daily"],
-                )
-                if progress:
-                    progress(f"{instrument.symbol}: Alpha Vantage rows={len(prices)}")
+                if not prices and source_enabled(source_config, "nasdaq_historical_prices"):
+                    if progress:
+                        progress(f"{instrument.symbol}: fetching Nasdaq historical prices")
+                    prices = self.fetch_nasdaq_historical_prices(
+                        instrument,
+                        source_config["nasdaq_historical_prices"],
+                    )
+                    if progress:
+                        progress(f"{instrument.symbol}: Nasdaq historical rows={len(prices)}")
+            except Exception as nasdaq_price_exc:  # noqa: BLE001
+                warnings.append(
+                    source_warning(instrument.symbol, "nasdaq_historical_prices", nasdaq_price_exc)
+            )
+            try:
+                if not prices and source_enabled(source_config, "alpha_vantage_daily"):
+                    if progress:
+                        progress(f"{instrument.symbol}: fetching Alpha Vantage prices")
+                    prices = self.fetch_alpha_vantage_prices(
+                        instrument,
+                        source_config["alpha_vantage_daily"],
+                    )
+                    if progress:
+                        progress(f"{instrument.symbol}: Alpha Vantage rows={len(prices)}")
             except Exception as alpha_exc:  # noqa: BLE001
                 warnings.append(source_warning(instrument.symbol, "alpha_vantage_daily", alpha_exc))
             try:
-                if not prices:
+                if not prices and source_enabled(source_config, "stooq_prices"):
                     if progress:
                         progress(f"{instrument.symbol}: fetching Stooq prices")
                     prices = self.fetch_stooq_prices(instrument, source_config["stooq_prices"])
@@ -88,6 +129,7 @@ class DataSourceClient:
                         progress(f"{instrument.symbol}: Stooq rows={len(prices)}")
             except Exception as fallback_exc:  # noqa: BLE001
                 warnings.append(source_warning(instrument.symbol, "stooq_prices", fallback_exc))
+
         if not prices:
             cached_prices = self.load_cached_prices(instrument)
             if cached_prices is not None:
@@ -156,6 +198,22 @@ class DataSourceClient:
             warnings=warnings,
         )
 
+    def load_local_csv_prices(self, instrument: Instrument) -> tuple[list[PriceBar], Path] | None:
+        if self.price_csv_dir is None:
+            return None
+        candidates = [
+            self.price_csv_dir / f"{instrument.symbol}.csv",
+            self.price_csv_dir / f"{instrument.symbol.lower()}.csv",
+            self.price_csv_dir / f"{instrument.symbol.upper()}.csv",
+        ]
+        for path in candidates:
+            if not path.exists():
+                continue
+            prices = parse_local_price_csv(path.read_text(encoding="utf-8-sig"))
+            if prices:
+                return prices, path
+        return None
+
     def fetch_yahoo_prices(self, instrument: Instrument, config: dict[str, Any]) -> list[PriceBar]:
         urls = [
             config["url_template"].format(symbol=instrument.symbol),
@@ -180,6 +238,32 @@ class DataSourceClient:
             raise RuntimeError("No Yahoo chart payload returned.")
         save_snapshot(self.raw_dir, "yahoo_chart_prices", instrument.symbol, payload, "json")
         return parse_yahoo_price_bars(payload)
+
+    def fetch_nasdaq_historical_prices(
+        self,
+        instrument: Instrument,
+        config: dict[str, Any],
+    ) -> list[PriceBar]:
+        today = datetime.now(UTC).date()
+        lookback_days = int(config.get("lookback_days", 365))
+        start = today - timedelta(days=lookback_days)
+        asset_class = config.get("asset_class", "stocks")
+        url = config["url_template"].format(
+            symbol=instrument.symbol.upper(),
+            asset_class=asset_class,
+            fromdate=start.isoformat(),
+            todate=today.isoformat(),
+        )
+        payload = _fetch(
+            url,
+            {
+                "Accept": "application/json, text/plain, */*",
+                "Origin": "https://www.nasdaq.com",
+                "Referer": f"https://www.nasdaq.com/market-activity/stocks/{instrument.symbol.lower()}/historical",
+            },
+        )
+        save_snapshot(self.raw_dir, "nasdaq_historical_prices", instrument.symbol, payload, "json")
+        return parse_nasdaq_historical_prices(payload)
 
     def fetch_alpha_vantage_prices(
         self,
@@ -249,6 +333,7 @@ class DataSourceClient:
     def load_cached_prices(self, instrument: Instrument) -> tuple[list[PriceBar], Path] | None:
         for source_name, suffix, parser in (
             ("yahoo_chart_prices", "json", parse_yahoo_price_bars),
+            ("nasdaq_historical_prices", "json", parse_nasdaq_historical_prices),
             ("stooq_prices", "csv", lambda payload: parse_stooq_price_bars(payload.decode("utf-8"))),
         ):
             snapshot_path = self.latest_snapshot(source_name, instrument.symbol, suffix)
@@ -342,6 +427,35 @@ def parse_yahoo_price_bars(payload: bytes) -> list[PriceBar]:
     return bars
 
 
+def parse_nasdaq_historical_prices(payload: bytes) -> list[PriceBar]:
+    data = json.loads(payload.decode("utf-8"))
+    rows = (
+        data.get("data", {})
+        .get("tradesTable", {})
+        .get("rows", [])
+    )
+    bars: list[PriceBar] = []
+    for row in rows:
+        date_text = row.get("date")
+        close = parse_market_number(row.get("close"))
+        if not date_text or close is None:
+            continue
+        bars.append(
+            PriceBar(
+                timestamp=parse_flexible_timestamp(date_text),
+                open=parse_market_number(row.get("open")),
+                high=parse_market_number(row.get("high")),
+                low=parse_market_number(row.get("low")),
+                close=close,
+                volume=parse_market_number(row.get("volume")),
+            )
+        )
+    bars.sort(key=lambda bar: bar.timestamp)
+    if not bars:
+        raise RuntimeError("Nasdaq historical API returned no usable price rows.")
+    return bars
+
+
 def parse_stooq_price_bars(text: str) -> list[PriceBar]:
     import csv
 
@@ -364,6 +478,32 @@ def parse_stooq_price_bars(text: str) -> list[PriceBar]:
         )
     if not bars:
         raise RuntimeError("Stooq returned no usable price rows.")
+    return bars
+
+
+def parse_local_price_csv(text: str) -> list[PriceBar]:
+    import csv
+
+    bars: list[PriceBar] = []
+    for row in csv.DictReader(text.splitlines()):
+        normalized = {key.lower(): value for key, value in row.items() if key is not None}
+        close = normalized.get("close")
+        date_text = normalized.get("date") or normalized.get("timestamp")
+        if not close or not date_text:
+            continue
+        bars.append(
+            PriceBar(
+                timestamp=parse_flexible_timestamp(date_text),
+                open=parse_optional_float(normalized.get("open")),
+                high=parse_optional_float(normalized.get("high")),
+                low=parse_optional_float(normalized.get("low")),
+                close=float(close),
+                volume=parse_optional_float(normalized.get("volume")),
+            )
+        )
+    bars.sort(key=lambda bar: bar.timestamp)
+    if not bars:
+        raise RuntimeError("Local price CSV returned no usable rows.")
     return bars
 
 
@@ -400,16 +540,50 @@ def parse_optional_float(value: str | None) -> float | None:
     return float(value)
 
 
+def parse_market_number(value: str | int | float | None) -> float | None:
+    if value in {None, "", "N/A"}:
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    cleaned = (
+        value.replace("$", "")
+        .replace(",", "")
+        .replace("%", "")
+        .strip()
+    )
+    if not cleaned:
+        return None
+    return float(cleaned)
+
+
 def parse_date_timestamp(date_text: str) -> int:
     from datetime import datetime
 
     return int(datetime.strptime(date_text, "%Y-%m-%d").timestamp())
 
 
+def parse_flexible_timestamp(value: str) -> int:
+    from datetime import datetime
+
+    value = value.strip()
+    if value.isdigit():
+        return int(value)
+    for pattern in ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y"):
+        try:
+            return int(datetime.strptime(value, pattern).timestamp())
+        except ValueError:
+            pass
+    raise ValueError(f"Unsupported date format: {value}")
+
+
 def source_warning(symbol: str, source_name: str, exc: Exception) -> str:
     if isinstance(exc, urllib.error.HTTPError):
         return f"{symbol}/{source_name}: HTTP {exc.code} {exc.reason}"
     return f"{symbol}/{source_name}: {type(exc).__name__}: {exc}"
+
+
+def source_enabled(source_config: dict[str, dict[str, Any]], source_name: str) -> bool:
+    return bool(source_config.get(source_name, {}).get("enabled", False))
 
 
 def safe_snapshot_name(value: str) -> str:

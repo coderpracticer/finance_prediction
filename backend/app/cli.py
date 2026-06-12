@@ -35,6 +35,12 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--config", type=Path, help="universe/data-source config path")
     report.add_argument("--database-path", type=Path, help="SQLite database path")
     report.add_argument("--raw-dir", type=Path, help="raw data snapshot directory")
+    report.add_argument("--price-csv-dir", type=Path, help="directory of local OHLCV CSV files")
+    report.add_argument(
+        "--allow-weak-price-data",
+        action="store_true",
+        help="allow report generation even when price history coverage is below the gate",
+    )
     report.add_argument("--output-dir", type=Path, help="report output directory")
     return parser
 
@@ -48,6 +54,8 @@ def generate_report(args: argparse.Namespace) -> int:
         config_path=args.config or settings.config_path,
         database_path=args.database_path or settings.database_path,
         raw_dir=args.raw_dir or settings.raw_dir,
+        price_csv_dir=args.price_csv_dir or settings.price_csv_dir,
+        require_price_history=False if args.allow_weak_price_data else settings.require_price_history,
         report_dir=args.output_dir or settings.report_dir,
     )
     horizons = tuple(item.strip() for item in args.horizons.split(",") if item.strip())
@@ -62,6 +70,8 @@ def generate_report(args: argparse.Namespace) -> int:
         )
     except LocalLLMError as exc:
         raise SystemExit(f"Local LLM configuration error: {exc}") from exc
+    except RuntimeError as exc:
+        raise SystemExit(f"Report generation error: {exc}") from exc
 
     print(f"run_id={artifacts.run_id}")
     print(f"candidates={artifacts.candidate_count}")

@@ -7,8 +7,13 @@ from backend.app.data_sources.spike import (
     parse_yahoo_chart,
     status_from,
 )
-from backend.app.data_sources.connectors import parse_date_timestamp, parse_optional_float
-from backend.app.data_sources.connectors import parse_yahoo_price_bars
+from backend.app.data_sources.connectors import (
+    parse_date_timestamp,
+    parse_local_price_csv,
+    parse_nasdaq_historical_prices,
+    parse_optional_float,
+    parse_yahoo_price_bars,
+)
 
 
 class DataSourceSpikeTests(unittest.TestCase):
@@ -102,6 +107,53 @@ class DataSourceSpikeTests(unittest.TestCase):
 
         self.assertEqual(len(prices), 2)
         self.assertEqual(prices[-1].close, 102.0)
+        self.assertEqual(prices[-1].volume, 1200)
+
+    def test_parse_local_price_csv_accepts_ohlcv_file(self) -> None:
+        text = (
+            "Date,Open,High,Low,Close,Volume\n"
+            "2026-06-10,100,103,99,102,1000\n"
+            "2026-06-11,102,105,101,104,1200\n"
+        )
+
+        prices = parse_local_price_csv(text)
+
+        self.assertEqual(len(prices), 2)
+        self.assertEqual(prices[0].close, 102)
+        self.assertEqual(prices[-1].volume, 1200)
+
+    def test_parse_nasdaq_historical_prices_returns_usable_prices(self) -> None:
+        payload = json.dumps(
+            {
+                "data": {
+                    "tradesTable": {
+                        "rows": [
+                            {
+                                "date": "06/10/2026",
+                                "close": "$102.00",
+                                "volume": "1,000",
+                                "open": "$100.00",
+                                "high": "$103.00",
+                                "low": "$99.00",
+                            },
+                            {
+                                "date": "06/11/2026",
+                                "close": "$104.00",
+                                "volume": "1,200",
+                                "open": "$102.00",
+                                "high": "$105.00",
+                                "low": "$101.00",
+                            },
+                        ]
+                    }
+                }
+            }
+        ).encode("utf-8")
+
+        prices = parse_nasdaq_historical_prices(payload)
+
+        self.assertEqual(len(prices), 2)
+        self.assertEqual(prices[-1].close, 104)
         self.assertEqual(prices[-1].volume, 1200)
 
     def test_status_from_classifies_results(self) -> None:

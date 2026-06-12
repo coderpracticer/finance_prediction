@@ -12,34 +12,38 @@ class AgentPrompt:
     user_prompt: str
 
 
-AGENT_ROLES: tuple[tuple[str, str, str], ...] = (
+AGENT_ROLES: tuple[tuple[str, str, str, str], ...] = (
     (
         "data_quality_auditor",
         "数据质量审计智能体",
         "审计数据覆盖、缓存使用、数据源警告和结论可信度边界。",
+        "只评价数据是否足以支撑研究；不要讨论买卖机会。",
     ),
     (
         "momentum_technical_analyst",
         "动量与技术面智能体",
         "分析多周期收益、均线偏离、成交量变化和短中期价格趋势。",
+        "只使用 Momentum、Risk、Volume/Attention 和 Data Coverage 因子；价格不足时必须说无法形成技术判断。",
     ),
     (
         "risk_challenger",
         "风险反证智能体",
         "优先寻找回撤、波动、数据缺口、过度解读和第一否定条件。",
+        "必须给出每类候选的第一否定条件；不要写正向推荐。",
     ),
     (
         "opportunity_scout",
         "机会发现智能体",
         "基于结构化证据识别值得继续研究的候选、Why now 和后续验证动作。",
+        "只提出研究优先级和验证动作；不得把新闻数量当作充分投资理由。",
     ),
 )
 
 
 def build_report_prompt(screening: ScreeningResponse, horizons: tuple[str, ...]) -> str:
     agent_role_text = "\n".join(
-        f"- {display_name}: {responsibility}"
-        for _role_id, display_name, responsibility in AGENT_ROLES
+        f"- {display_name}: {responsibility} 角色边界：{boundary}"
+        for _role_id, display_name, responsibility, boundary in AGENT_ROLES
     )
     horizon_text = ", ".join(horizons)
     candidates_text = "\n\n".join(format_candidate(candidate) for candidate in screening.candidates)
@@ -84,12 +88,13 @@ def build_agent_prompts(
     horizon_text = ", ".join(horizons)
     evidence = build_evidence_block(screening)
     prompts: list[AgentPrompt] = []
-    for role_id, display_name, responsibility in AGENT_ROLES:
+    for role_id, display_name, responsibility, boundary in AGENT_ROLES:
         prompts.append(
             AgentPrompt(
                 name=role_id,
                 system_prompt=(
                     f"你是{display_name}。{responsibility}"
+                    f"角色边界：{boundary}"
                     "只能基于用户提供的结构化证据分析，不得编造未提供的数据。"
                     "不要输出 <think>、推理草稿或内部分析过程。"
                     "输出要简洁但具体，服务于最终中文投资研究报告。"
@@ -101,7 +106,8 @@ def build_agent_prompts(
                     "1. 关键观察\n"
                     "2. 支持证据\n"
                     "3. 主要风险或限制\n"
-                    "4. 对最终报告的建议\n\n"
+                    "4. 对最终报告的建议\n"
+                    "5. 不应被最终报告采用的过度解读\n\n"
                     f"{evidence}"
                 ),
             )

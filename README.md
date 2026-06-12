@@ -104,6 +104,14 @@ reports/YYYY-MM-DD/investment_report_*.md
 reports/YYYY-MM-DD/investment_report_*.pdf
 ```
 
+正式报告默认要求价格数据覆盖率达标。系统会优先通过网络抓取价格数据：
+
+```bash
+python -m backend.app.cli generate-report --top-n 10
+```
+
+如果网络价格源暂时不可用，可以使用 `--allow-weak-price-data` 做诊断，但不建议把它作为正式研究输出。价格数据门槛见 [project-critical-path.md](docs/project-critical-path.md)。
+
 ## 5. 验证
 
 ```bash

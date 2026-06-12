@@ -119,6 +119,13 @@
       "category": "price",
       "url_template": "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=3mo&interval=1d"
     },
+    "nasdaq_historical_prices": {
+      "enabled": true,
+      "category": "price",
+      "asset_class": "stocks",
+      "lookback_days": 365,
+      "url_template": "https://api.nasdaq.com/api/quote/{symbol}/historical?assetclass={asset_class}&fromdate={fromdate}&todate={todate}&limit=9999"
+    },
     "stooq_prices": {
       "enabled": false,
       "category": "price",

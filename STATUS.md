@@ -36,7 +36,7 @@
 
 ## In Progress
 
-- Server report generation works; price data source reliability is the current main quality blocker.
+- Server report generation works; next quality work should center on crawler price reliability and refining agent prompts from actual report examples.
 
 ## Next Actions
 
@@ -57,8 +57,9 @@
 ## Validation Results
 
 - `uv pip install -e .`: succeeded after allowing uv to use its external cache directory.
-- `python -m unittest discover -s tests`: 20 tests passed.
-- `python -m compileall backend`: passed.
+- `python -m unittest discover -s tests`: 23 tests passed.
+- `python -m compileall backend`: blocked by Windows `__pycache__` write permission on one file.
+- Syntax compile without writing `.pyc`: passed.
 - `python -m backend.app.cli --help`: CLI help renders successfully.
 - Source scan found no active FastAPI/Dashboard/API/chat route references.
 - `git status` without safe-directory override is blocked by Git dubious ownership protection; read-only status works with `git -c safe.directory="C:/Users/Administrator/Documents/New project"`.
@@ -123,3 +124,37 @@
   - Add news-title samples to event evidence so the LLM does not infer news themes from counts alone.
   - Penalize missing price history by marking low data coverage as `weak` and discounting score.
   - Search sibling raw snapshot directories for cached price/news/fundamental data.
+
+## Latest Critical Path Update
+
+- Elevated the two key project constraints into code and docs:
+  - reliable, sufficient price data
+  - clear agent roles and prompt boundaries
+- Added crawler-first price handling:
+  - Yahoo chart crawler
+  - Nasdaq historical crawler
+  - Alpha Vantage fallback when a key is available
+  - Stooq fallback when enabled and reachable
+  - raw snapshot cache fallback
+- Kept local CSV as optional diagnostics only, not as a project dependency:
+  - `FRA_PRICE_CSV_DIR`
+  - `--price-csv-dir`
+- Added formal report gate:
+  - `FRA_REQUIRE_PRICE_HISTORY=true`
+  - `FRA_MIN_PRICE_ROWS=60`
+  - `FRA_MIN_PRICE_COVERAGE_RATIO=0.8`
+  - diagnostics-only bypass: `--allow-weak-price-data`
+- Tightened agent prompts with explicit role boundaries:
+  - data quality auditor does not discuss opportunities
+  - technical analyst only uses technical/data coverage factors
+  - risk challenger does not write positive recommendations
+  - opportunity scout cannot treat news count as sufficient evidence
+- Added `docs/project-critical-path.md`.
+
+## Latest Crawler-Only Constraint Update
+
+- User clarified there is no local market data and prices must be obtained through crawling.
+- Updated docs to make crawler retrieval the formal path and local CSV diagnostic-only.
+- Added `nasdaq_historical_prices` to `configs/data_source_spike.json`.
+- Updated source selection so disabled sources are not attempted.
+- Added parser coverage for Nasdaq historical OHLCV JSON.

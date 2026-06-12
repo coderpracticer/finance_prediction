@@ -30,6 +30,11 @@
 - [x] Add real news-title samples to event evidence.
 - [x] Penalize missing price history as weak data quality.
 - [x] Expand cache lookup across sibling raw snapshot directories.
+- [x] Add Nasdaq historical crawler as a no-key price fallback.
+- [x] Keep local CSV only as an optional diagnostics path.
+- [x] Add price-history coverage gate before formal report generation.
+- [x] Add explicit agent role boundaries and output contracts.
+- [x] Document the two project-critical paths: price data and agent prompting.
 
 ## Next Technical Improvements
 
@@ -40,4 +45,4 @@
 - [ ] Add retry/backoff controls for public data sources.
 - [x] Add richer short-term and 1-3 month factor sets.
 - [ ] Add a scheduled server cron/systemd example after manual generation is stable.
-- [ ] Add a stable price-data provider path for server runs.
+- [x] Add an additional crawler-based price provider path for server runs.

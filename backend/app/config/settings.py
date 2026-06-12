@@ -17,6 +17,10 @@ class Settings:
     database_path: Path = Path("data/app.db")
     raw_dir: Path = Path("data/raw/mvp")
     report_dir: Path = Path("reports")
+    price_csv_dir: Path | None = None
+    require_price_history: bool = True
+    min_price_rows: int = 60
+    min_price_coverage_ratio: float = 0.8
     local_llm_base_url: str = "http://127.0.0.1:8001/v1"
     local_llm_api_key: str = "local"
     local_llm_model: str = "local-finance-agent"
@@ -24,11 +28,17 @@ class Settings:
 
 
 def get_settings() -> Settings:
+    price_csv_dir = os.getenv("FRA_PRICE_CSV_DIR")
     return Settings(
         config_path=Path(os.getenv("FRA_CONFIG_PATH", "configs/data_source_spike.json")),
         database_path=Path(os.getenv("FRA_DATABASE_PATH", "data/app.db")),
         raw_dir=Path(os.getenv("FRA_RAW_DIR", "data/raw/mvp")),
         report_dir=Path(os.getenv("FRA_REPORT_DIR", "reports")),
+        price_csv_dir=Path(price_csv_dir) if price_csv_dir else None,
+        require_price_history=os.getenv("FRA_REQUIRE_PRICE_HISTORY", "true").lower()
+        in {"1", "true", "yes", "y"},
+        min_price_rows=int(os.getenv("FRA_MIN_PRICE_ROWS", "60")),
+        min_price_coverage_ratio=float(os.getenv("FRA_MIN_PRICE_COVERAGE_RATIO", "0.8")),
         local_llm_base_url=os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8001/v1"),
         local_llm_api_key=os.getenv("LOCAL_LLM_API_KEY", "local"),
         local_llm_model=os.getenv("LOCAL_LLM_MODEL", "local-finance-agent"),
