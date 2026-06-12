@@ -36,7 +36,7 @@
 
 ## In Progress
 
-- Real server end-to-end validation is pending until the 2x4090 local LLM API is running.
+- Real server end-to-end validation of the improved report is pending.
 
 ## Next Actions
 
@@ -57,7 +57,7 @@
 ## Validation Results
 
 - `uv pip install -e .`: succeeded after allowing uv to use its external cache directory.
-- `python -m unittest discover -s tests`: 15 tests passed.
+- `python -m unittest discover -s tests`: 16 tests passed.
 - `python -m compileall backend`: passed.
 - `python -m backend.app.cli --help`: CLI help renders successfully.
 - Source scan found no active FastAPI/Dashboard/API/chat route references.
@@ -73,3 +73,33 @@
   - run validation
 - Simplified `docs/server-command-runbook.md` with the same vLLM-first deployment flow.
 - Kept troubleshooting minimal and command-oriented.
+- Updated the vLLM command and `.env` example to use port `8001`.
+- Documented that `LOCAL_LLM_MODEL` must match the vLLM `/v1/models` id or `--served-model-name`.
+- Improved local LLM HTTP errors to include the actually requested model name.
+
+## Latest Report Quality Update
+
+- Added cached raw snapshot fallback when live Yahoo, Nasdaq RSS, or SEC requests fail.
+- Added stronger data-quality handling so missing price history is not scored as neutral.
+- Expanded factor evidence:
+  - data coverage
+  - 5/20/60-day returns
+  - 20/60-day moving-average distance
+  - annualized volatility
+  - 60-day max drawdown
+  - downside volatility
+  - volume attention
+- Strengthened the LLM prompt to produce a deeper Chinese research memo with candidate tiers, short-term and 1-3 month views, first invalidation condition, and follow-up checks.
+- Added data-source health and raw factor values to Markdown reports.
+- Local cache check confirmed AAPL can read 64 cached Yahoo price rows and compute momentum/risk factors.
+
+## Latest Agent Role Update
+
+- Current previous state: only one real LLM role, the final research writer; factor calculations were deterministic code, not agents.
+- Added lightweight multi-agent prompting without adding a heavy agent framework:
+  - `data_quality_auditor`
+  - `momentum_technical_analyst`
+  - `risk_challenger`
+  - `opportunity_scout`
+  - `final_research_writer`
+- Each role uses the same local OpenAI-compatible LLM API with a different system prompt.

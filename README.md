@@ -26,13 +26,19 @@
 示例：
 
 ```bash
-vllm serve Qwen/Qwen2.5-32B-Instruct \
+python -m vllm.entrypoints.openai.api_server \
+  --model /path/to/your/model \
+  --served-model-name Qwen/Qwen2.5-1.5B-Instruct \
   --host 0.0.0.0 \
   --port 8001 \
+  --max-model-len 131072 \
+  --rope-scaling '{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}' \
   --tensor-parallel-size 2
 ```
 
 如果使用较小模型，可以把 `--tensor-parallel-size` 改成 `1`。只要服务兼容 `/v1/chat/completions` 即可。
+
+关键点：`--served-model-name` 要和后面 `.env` 里的 `LOCAL_LLM_MODEL` 保持一致。
 
 检查服务：
 
@@ -65,11 +71,19 @@ ALPHA_VANTAGE_API_KEY=
 
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
 LOCAL_LLM_API_KEY=local
-LOCAL_LLM_MODEL=Qwen/Qwen2.5-32B-Instruct
+LOCAL_LLM_MODEL=Qwen/Qwen2.5-1.5B-Instruct
 LOCAL_LLM_TIMEOUT_SECONDS=180
 ```
 
 如果模型服务在另一台机器，把 `LOCAL_LLM_BASE_URL` 改成内网地址。
+
+如果不确定模型名，先看 vLLM 返回的 id：
+
+```bash
+curl http://127.0.0.1:8001/v1/models
+```
+
+然后把返回的 `id` 填到 `LOCAL_LLM_MODEL`。
 
 ## 4. 运行报告生成
 
@@ -121,6 +135,13 @@ LLM 连接失败：
 
 ```bash
 curl http://127.0.0.1:8001/v1/models
+```
+
+如果报错里出现了一个你没有写进 `.env` 的旧模型名，检查当前 shell 是否有旧环境变量：
+
+```bash
+echo $LOCAL_LLM_MODEL
+unset LOCAL_LLM_MODEL
 ```
 
 依赖缺失：

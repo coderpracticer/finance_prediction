@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Callable
 
 from backend.app.config.settings import Settings
 from backend.app.data_sources.connectors import DataSourceClient
@@ -15,13 +16,26 @@ class ScreeningService:
         self.data_sources = DataSourceClient(settings.config_path, settings.raw_dir)
         self.repository = ResearchRepository(settings.database_path)
 
-    def run(self, limit: int = 10) -> ScreeningResponse:
+    def run(
+        self,
+        limit: int = 10,
+        progress: Callable[[str], None] | None = None,
+    ) -> ScreeningResponse:
         candidates: list[Candidate] = []
         warnings: list[str] = []
-        for instrument in self.data_sources.universe():
+        report_progress = progress or (lambda _message: None)
+        universe = self.data_sources.universe()
+        report_progress(f"loaded universe; instruments={len(universe)}")
+        for index, instrument in enumerate(universe, start=1):
+            report_progress(f"[{index}/{len(universe)}] fetching {instrument.symbol}")
             try:
-                dataset = self.data_sources.fetch_dataset(instrument)
+                dataset = self.data_sources.fetch_dataset(instrument, progress=report_progress)
                 warnings.extend(dataset.warnings)
+                report_progress(
+                    f"[{index}/{len(universe)}] calculating factors for {instrument.symbol}; "
+                    f"prices={len(dataset.prices)}, news={len(dataset.news)}, "
+                    f"warnings={len(dataset.warnings)}"
+                )
                 factors = calculate_factors(dataset)
                 score, confidence, data_quality = aggregate_score(factors)
                 candidates.append(
@@ -38,8 +52,16 @@ class ScreeningService:
                         risks=default_risks(data_quality, dataset.warnings),
                     )
                 )
+                report_progress(
+                    f"[{index}/{len(universe)}] {instrument.symbol} score={score:.2f}, "
+                    f"confidence={confidence:.2f}, quality={data_quality}"
+                )
             except Exception as exc:  # noqa: BLE001 - source-specific failures should not kill run.
                 warnings.append(f"{instrument.symbol}: {type(exc).__name__}: {exc}")
+                report_progress(
+                    f"[{index}/{len(universe)}] {instrument.symbol} failed: "
+                    f"{type(exc).__name__}: {exc}"
+                )
 
         candidates.sort(key=lambda candidate: candidate.opportunity_score, reverse=True)
         for index, candidate in enumerate(candidates[:limit], start=1):

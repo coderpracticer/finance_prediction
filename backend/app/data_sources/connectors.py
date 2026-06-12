@@ -6,7 +6,7 @@ import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from backend.app.data_sources.spike import (
     DEFAULT_SEC_USER_AGENT,
@@ -47,7 +47,11 @@ class DataSourceClient:
     def universe(self) -> list[Instrument]:
         return [Instrument(**item) for item in self.config["universe"]]
 
-    def fetch_dataset(self, instrument: Instrument) -> InstrumentDataset:
+    def fetch_dataset(
+        self,
+        instrument: Instrument,
+        progress: Callable[[str], None] | None = None,
+    ) -> InstrumentDataset:
         source_config = self.config["sources"]
         warnings: list[str] = []
         prices: list[PriceBar] = []
@@ -55,32 +59,93 @@ class DataSourceClient:
         fundamentals = None
 
         try:
+            if progress:
+                progress(f"{instrument.symbol}: fetching Yahoo prices")
             prices = self.fetch_yahoo_prices(instrument, source_config["yahoo_chart_prices"])
+            if progress:
+                progress(f"{instrument.symbol}: Yahoo prices rows={len(prices)}")
         except Exception as exc:  # noqa: BLE001 - keep other sources usable.
             warnings.append(source_warning(instrument.symbol, "yahoo_chart_prices", exc))
+            if progress:
+                progress(f"{instrument.symbol}: Yahoo prices failed; trying fallback")
             try:
+                if progress:
+                    progress(f"{instrument.symbol}: fetching Alpha Vantage prices")
                 prices = self.fetch_alpha_vantage_prices(
                     instrument,
                     source_config["alpha_vantage_daily"],
                 )
+                if progress:
+                    progress(f"{instrument.symbol}: Alpha Vantage rows={len(prices)}")
             except Exception as alpha_exc:  # noqa: BLE001
                 warnings.append(source_warning(instrument.symbol, "alpha_vantage_daily", alpha_exc))
             try:
                 if not prices:
+                    if progress:
+                        progress(f"{instrument.symbol}: fetching Stooq prices")
                     prices = self.fetch_stooq_prices(instrument, source_config["stooq_prices"])
+                    if progress:
+                        progress(f"{instrument.symbol}: Stooq rows={len(prices)}")
             except Exception as fallback_exc:  # noqa: BLE001
                 warnings.append(source_warning(instrument.symbol, "stooq_prices", fallback_exc))
+        if not prices:
+            cached_prices = self.load_cached_prices(instrument)
+            if cached_prices is not None:
+                prices, snapshot_path = cached_prices
+                warnings.append(
+                    f"{instrument.symbol}/price_cache: using cached snapshot {snapshot_path.name}"
+                )
+                if progress:
+                    progress(
+                        f"{instrument.symbol}: using cached price rows={len(prices)} "
+                        f"from {snapshot_path.name}"
+                    )
 
         try:
+            if progress:
+                progress(f"{instrument.symbol}: fetching Nasdaq RSS")
             news = self.fetch_nasdaq_news(instrument, source_config["nasdaq_stock_rss"])
+            if progress:
+                progress(f"{instrument.symbol}: Nasdaq RSS items={len(news)}")
         except Exception as exc:  # noqa: BLE001
             warnings.append(source_warning(instrument.symbol, "nasdaq_stock_rss", exc))
+            if progress:
+                progress(f"{instrument.symbol}: Nasdaq RSS failed: {type(exc).__name__}: {exc}")
+            cached_news = self.load_cached_news(instrument)
+            if cached_news is not None:
+                news, snapshot_path = cached_news
+                warnings.append(
+                    f"{instrument.symbol}/news_cache: using cached snapshot {snapshot_path.name}"
+                )
+                if progress:
+                    progress(
+                        f"{instrument.symbol}: using cached news items={len(news)} "
+                        f"from {snapshot_path.name}"
+                    )
 
         if instrument.cik:
             try:
+                if progress:
+                    progress(f"{instrument.symbol}: fetching SEC companyfacts")
                 fundamentals = self.fetch_sec_companyfacts(instrument, source_config["sec_companyfacts"])
+                if progress:
+                    progress(f"{instrument.symbol}: SEC metrics={fundamentals.metric_count}")
             except Exception as exc:  # noqa: BLE001
                 warnings.append(source_warning(instrument.symbol, "sec_companyfacts", exc))
+                if progress:
+                    progress(f"{instrument.symbol}: SEC companyfacts failed: {type(exc).__name__}: {exc}")
+                cached_fundamentals = self.load_cached_fundamentals(instrument)
+                if cached_fundamentals is not None:
+                    fundamentals, snapshot_path = cached_fundamentals
+                    warnings.append(
+                        f"{instrument.symbol}/fundamentals_cache: using cached snapshot "
+                        f"{snapshot_path.name}"
+                    )
+                    if progress:
+                        progress(
+                            f"{instrument.symbol}: using cached SEC metrics="
+                            f"{fundamentals.metric_count} from {snapshot_path.name}"
+                        )
         return InstrumentDataset(
             instrument=instrument,
             prices=prices,
@@ -112,29 +177,7 @@ class DataSourceClient:
                 raise last_error
             raise RuntimeError("No Yahoo chart payload returned.")
         save_snapshot(self.raw_dir, "yahoo_chart_prices", instrument.symbol, payload, "json")
-        data = json.loads(payload.decode("utf-8"))
-        results = data.get("chart", {}).get("result") or []
-        if not results:
-            raise RuntimeError("Yahoo chart returned no result.")
-        result = results[0]
-        timestamps = result.get("timestamp") or []
-        quote = (result.get("indicators", {}).get("quote") or [{}])[0]
-        bars: list[PriceBar] = []
-        for index, timestamp in enumerate(timestamps):
-            close = _list_get(quote.get("close"), index)
-            if close is None:
-                continue
-            bars.append(
-                PriceBar(
-                    timestamp=timestamp,
-                    open=_list_get(quote.get("open"), index),
-                    high=_list_get(quote.get("high"), index),
-                    low=_list_get(quote.get("low"), index),
-                    close=close,
-                    volume=_list_get(quote.get("volume"), index),
-                )
-            )
-        return bars
+        return parse_yahoo_price_bars(payload)
 
     def fetch_alpha_vantage_prices(
         self,
@@ -192,33 +235,62 @@ class DataSourceClient:
         user_agent_env = config.get("user_agent_env", "SEC_USER_AGENT")
         payload = _fetch(url, {"User-Agent": os.getenv(user_agent_env, DEFAULT_SEC_USER_AGENT)})
         save_snapshot(self.raw_dir, "sec_companyfacts", instrument.symbol, payload, "json")
-        data = json.loads(payload.decode("utf-8"))
-        us_gaap = data.get("facts", {}).get("us-gaap", {})
-        metrics = sorted(us_gaap.keys())
-        return FundamentalSnapshot(
-            metric_count=len(metrics),
-            available_metrics=metrics[:50],
-            has_revenue="Revenues" in us_gaap,
-            has_net_income="NetIncomeLoss" in us_gaap,
-            has_eps="EarningsPerShareDiluted" in us_gaap,
-        )
+        return parse_sec_companyfacts_snapshot(payload)
 
     def fetch_nasdaq_news(self, instrument: Instrument, config: dict[str, Any]) -> list[NewsItem]:
         url = config["url_template"].format(symbol=instrument.symbol)
         payload = _fetch(url)
         save_snapshot(self.raw_dir, "nasdaq_stock_rss", instrument.symbol, payload, "xml")
         root = ET.fromstring(payload)
-        items: list[NewsItem] = []
-        for item in root.findall(".//item")[:20]:
-            items.append(
-                NewsItem(
-                    title=_xml_text(item, "title") or "Untitled",
-                    link=_xml_text(item, "link"),
-                    published_at=_xml_text(item, "pubDate"),
-                    summary=_xml_text(item, "description"),
-                )
-            )
-        return items
+        return parse_rss_news(root)
+
+    def load_cached_prices(self, instrument: Instrument) -> tuple[list[PriceBar], Path] | None:
+        for source_name, suffix, parser in (
+            ("yahoo_chart_prices", "json", parse_yahoo_price_bars),
+            ("stooq_prices", "csv", lambda payload: parse_stooq_price_bars(payload.decode("utf-8"))),
+        ):
+            snapshot_path = self.latest_snapshot(source_name, instrument.symbol, suffix)
+            if snapshot_path is None:
+                continue
+            try:
+                prices = parser(snapshot_path.read_bytes())
+            except Exception:  # noqa: BLE001 - ignore unusable stale cache candidates.
+                continue
+            if prices:
+                return prices, snapshot_path
+        return None
+
+    def load_cached_news(self, instrument: Instrument) -> tuple[list[NewsItem], Path] | None:
+        snapshot_path = self.latest_snapshot("nasdaq_stock_rss", instrument.symbol, "xml")
+        if snapshot_path is None:
+            return None
+        try:
+            root = ET.fromstring(snapshot_path.read_bytes())
+            return parse_rss_news(root), snapshot_path
+        except Exception:  # noqa: BLE001
+            return None
+
+    def load_cached_fundamentals(
+        self,
+        instrument: Instrument,
+    ) -> tuple[FundamentalSnapshot, Path] | None:
+        snapshot_path = self.latest_snapshot("sec_companyfacts", instrument.symbol, "json")
+        if snapshot_path is None:
+            return None
+        try:
+            return parse_sec_companyfacts_snapshot(snapshot_path.read_bytes()), snapshot_path
+        except Exception:  # noqa: BLE001
+            return None
+
+    def latest_snapshot(self, source_name: str, symbol: str, suffix: str) -> Path | None:
+        safe_source = safe_snapshot_name(source_name)
+        safe_symbol = safe_snapshot_name(symbol)
+        matches = sorted(
+            self.raw_dir.glob(f"*_{safe_source}_{safe_symbol}.{suffix}"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        return matches[0] if matches else None
 
 
 def _list_get(values: list[Any] | None, index: int) -> Any:
@@ -232,6 +304,34 @@ def _xml_text(item: ET.Element, tag: str) -> str | None:
     if node is None or node.text is None:
         return None
     return node.text.strip()
+
+
+def parse_yahoo_price_bars(payload: bytes) -> list[PriceBar]:
+    data = json.loads(payload.decode("utf-8"))
+    results = data.get("chart", {}).get("result") or []
+    if not results:
+        raise RuntimeError("Yahoo chart returned no result.")
+    result = results[0]
+    timestamps = result.get("timestamp") or []
+    quote = (result.get("indicators", {}).get("quote") or [{}])[0]
+    bars: list[PriceBar] = []
+    for index, timestamp in enumerate(timestamps):
+        close = _list_get(quote.get("close"), index)
+        if close is None:
+            continue
+        bars.append(
+            PriceBar(
+                timestamp=timestamp,
+                open=_list_get(quote.get("open"), index),
+                high=_list_get(quote.get("high"), index),
+                low=_list_get(quote.get("low"), index),
+                close=close,
+                volume=_list_get(quote.get("volume"), index),
+            )
+        )
+    if not bars:
+        raise RuntimeError("Yahoo chart returned no usable price bars.")
+    return bars
 
 
 def parse_stooq_price_bars(text: str) -> list[PriceBar]:
@@ -259,6 +359,33 @@ def parse_stooq_price_bars(text: str) -> list[PriceBar]:
     return bars
 
 
+def parse_rss_news(root: ET.Element) -> list[NewsItem]:
+    items: list[NewsItem] = []
+    for item in root.findall(".//item")[:20]:
+        items.append(
+            NewsItem(
+                title=_xml_text(item, "title") or "Untitled",
+                link=_xml_text(item, "link"),
+                published_at=_xml_text(item, "pubDate"),
+                summary=_xml_text(item, "description"),
+            )
+        )
+    return items
+
+
+def parse_sec_companyfacts_snapshot(payload: bytes) -> FundamentalSnapshot:
+    data = json.loads(payload.decode("utf-8"))
+    us_gaap = data.get("facts", {}).get("us-gaap", {})
+    metrics = sorted(us_gaap.keys())
+    return FundamentalSnapshot(
+        metric_count=len(metrics),
+        available_metrics=metrics[:50],
+        has_revenue="Revenues" in us_gaap,
+        has_net_income="NetIncomeLoss" in us_gaap,
+        has_eps="EarningsPerShareDiluted" in us_gaap,
+    )
+
+
 def parse_optional_float(value: str | None) -> float | None:
     if value in {None, ""}:
         return None
@@ -275,3 +402,7 @@ def source_warning(symbol: str, source_name: str, exc: Exception) -> str:
     if isinstance(exc, urllib.error.HTTPError):
         return f"{symbol}/{source_name}: HTTP {exc.code} {exc.reason}"
     return f"{symbol}/{source_name}: {type(exc).__name__}: {exc}"
+
+
+def safe_snapshot_name(value: str) -> str:
+    return "".join(char.lower() if char.isalnum() else "_" for char in value).strip("_")

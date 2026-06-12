@@ -6,7 +6,7 @@ from backend.app.cli import build_parser
 from backend.app.models.schemas import Candidate, FactorScore, ScreeningResponse
 from backend.app.reports.markdown import render_markdown_report
 from backend.app.reports.pdf import render_pdf_from_markdown
-from backend.app.research.prompts import build_report_prompt
+from backend.app.research.prompts import build_agent_prompts, build_report_prompt, build_synthesis_prompt
 
 
 def sample_screening() -> ScreeningResponse:
@@ -46,6 +46,27 @@ class ReportTests(unittest.TestCase):
         self.assertIn("short, medium", prompt)
         self.assertIn("AAPL", prompt)
         self.assertIn("第一否定条件", prompt)
+        self.assertIn("数据质量审计智能体", prompt)
+
+    def test_agent_prompts_define_lightweight_roles(self) -> None:
+        prompts = build_agent_prompts(sample_screening(), ("short", "medium"))
+        names = {prompt.name for prompt in prompts}
+
+        self.assertIn("data_quality_auditor", names)
+        self.assertIn("momentum_technical_analyst", names)
+        self.assertIn("risk_challenger", names)
+        self.assertIn("opportunity_scout", names)
+
+    def test_synthesis_prompt_includes_agent_outputs(self) -> None:
+        prompt = build_synthesis_prompt(
+            sample_screening(),
+            ("short", "medium"),
+            {"risk_challenger": "主要风险是数据缺口。"},
+        )
+
+        self.assertIn("多智能体中间结论", prompt)
+        self.assertIn("risk_challenger", prompt)
+        self.assertIn("主要风险是数据缺口", prompt)
 
     def test_markdown_report_contains_ranked_table_and_notice(self) -> None:
         markdown = render_markdown_report(

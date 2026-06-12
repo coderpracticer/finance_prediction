@@ -21,9 +21,13 @@ uv available
 ## 2. 启动 vLLM
 
 ```bash
-vllm serve Qwen/Qwen2.5-32B-Instruct \
+python -m vllm.entrypoints.openai.api_server \
+  --model /path/to/your/model \
+  --served-model-name Qwen/Qwen2.5-1.5B-Instruct \
   --host 0.0.0.0 \
   --port 8001 \
+  --max-model-len 131072 \
+  --rope-scaling '{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}' \
   --tensor-parallel-size 2
 ```
 
@@ -62,9 +66,11 @@ ALPHA_VANTAGE_API_KEY=
 
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
 LOCAL_LLM_API_KEY=local
-LOCAL_LLM_MODEL=Qwen/Qwen2.5-32B-Instruct
+LOCAL_LLM_MODEL=Qwen/Qwen2.5-1.5B-Instruct
 LOCAL_LLM_TIMEOUT_SECONDS=180
 ```
+
+`LOCAL_LLM_MODEL` 必须等于 `curl http://127.0.0.1:8001/v1/models` 返回的模型 `id`。最简单做法是在启动 vLLM 时使用 `--served-model-name`，并把 `.env` 写成同一个值。
 
 ## 5. 生成报告
 
@@ -96,6 +102,8 @@ LLM API 没连上：
 ```bash
 ss -lntp | grep 8001
 curl http://127.0.0.1:8001/v1/models
+echo $LOCAL_LLM_MODEL
+unset LOCAL_LLM_MODEL
 ```
 
 依赖问题：

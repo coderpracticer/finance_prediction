@@ -8,6 +8,7 @@ from backend.app.data_sources.spike import (
     status_from,
 )
 from backend.app.data_sources.connectors import parse_date_timestamp, parse_optional_float
+from backend.app.data_sources.connectors import parse_yahoo_price_bars
 
 
 class DataSourceSpikeTests(unittest.TestCase):
@@ -71,6 +72,37 @@ class DataSourceSpikeTests(unittest.TestCase):
         self.assertEqual(records, 1)
         self.assertIn("close", fields)
         self.assertEqual(warnings, [])
+
+    def test_parse_yahoo_price_bars_returns_usable_prices(self) -> None:
+        payload = json.dumps(
+            {
+                "chart": {
+                    "result": [
+                        {
+                            "timestamp": [1780790400, 1780876800],
+                            "indicators": {
+                                "quote": [
+                                    {
+                                        "open": [100.0, 101.0],
+                                        "high": [101.0, 103.0],
+                                        "low": [99.0, 100.0],
+                                        "close": [100.5, 102.0],
+                                        "volume": [1000, 1200],
+                                    }
+                                ]
+                            },
+                        }
+                    ],
+                    "error": None,
+                }
+            }
+        ).encode("utf-8")
+
+        prices = parse_yahoo_price_bars(payload)
+
+        self.assertEqual(len(prices), 2)
+        self.assertEqual(prices[-1].close, 102.0)
+        self.assertEqual(prices[-1].volume, 1200)
 
     def test_status_from_classifies_results(self) -> None:
         self.assertEqual(status_from([], [], 10), "passed")

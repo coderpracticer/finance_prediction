@@ -22,6 +22,7 @@ def render_markdown_report(
         for candidate in screening.candidates
     )
     warnings = "\n".join(f"- {warning}" for warning in screening.warnings) or "- None"
+    warning_summary = summarize_warnings(screening.warnings)
     factor_sections = "\n\n".join(
         "\n".join(
             [
@@ -31,13 +32,15 @@ def render_markdown_report(
                 f"- Confidence: {candidate.confidence:.2f}",
                 f"- Data quality: {candidate.data_quality}",
                 f"- Evidence summary: {candidate.thesis}",
+                f"- Risks: {'; '.join(candidate.risks)}",
                 "",
-                "| Group | Factor | Score | Confidence | Evidence |",
-                "| --- | --- | ---: | ---: | --- |",
+                "| Group | Factor | Score | Confidence | Raw Value | Evidence |",
+                "| --- | --- | ---: | ---: | ---: | --- |",
                 *[
                     (
                         f"| {factor.group} | {factor.name} | {factor.score:.1f} | "
-                        f"{factor.confidence:.2f} | {factor.evidence} |"
+                        f"{factor.confidence:.2f} | {factor.raw_value if factor.raw_value is not None else '-'} | "
+                        f"{factor.evidence} |"
                     )
                     for factor in candidate.factors
                 ],
@@ -51,6 +54,8 @@ def render_markdown_report(
         f"- Screening run: {screening.run_id}\n"
         f"- Horizons: {', '.join(horizons)}\n"
         f"- Candidate count: {len(screening.candidates)}\n\n"
+        "## Data Source Health\n\n"
+        f"{warning_summary}\n\n"
         "## LLM Research Summary\n\n"
         f"{llm_report.strip()}\n\n"
         "## Ranked Candidates\n\n"
@@ -65,3 +70,23 @@ def render_markdown_report(
         "This report is generated from free public data and a local LLM for research triage only. "
         "It is not financial advice, a recommendation, or an automated trading signal.\n"
     )
+
+
+def summarize_warnings(warnings: list[str]) -> str:
+    if not warnings:
+        return "- No data source warnings."
+    source_counts: dict[str, int] = {}
+    cache_count = 0
+    for warning in warnings:
+        if "_cache:" in warning:
+            cache_count += 1
+        parts = warning.split(":", 1)[0].split("/", 1)
+        source = parts[1] if len(parts) > 1 else "unknown"
+        source_counts[source] = source_counts.get(source, 0) + 1
+    lines = [
+        f"- Total warnings: {len(warnings)}",
+        f"- Cached fallbacks used: {cache_count}",
+    ]
+    for source, count in sorted(source_counts.items()):
+        lines.append(f"- {source}: {count}")
+    return "\n".join(lines)

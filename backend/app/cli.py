@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -57,6 +58,7 @@ def generate_report(args: argparse.Namespace) -> int:
             top_n=args.top_n,
             horizons=horizons,
             output_dir=args.output_dir,
+            progress=print_progress,
         )
     except LocalLLMError as exc:
         raise SystemExit(f"Local LLM configuration error: {exc}") from exc
@@ -67,6 +69,10 @@ def generate_report(args: argparse.Namespace) -> int:
     print(f"markdown={artifacts.markdown_path}")
     print(f"pdf={artifacts.pdf_path}")
     return 0
+
+
+def print_progress(message: str) -> None:
+    print(f"[fra-report] {message}", file=sys.stderr, flush=True)
 
 
 if __name__ == "__main__":

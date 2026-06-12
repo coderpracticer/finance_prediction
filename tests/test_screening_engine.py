@@ -57,13 +57,16 @@ class ScreeningEngineTests(unittest.TestCase):
     def test_build_evidence_summary_uses_top_factors(self) -> None:
         dataset = InstrumentDataset(
             instrument=Instrument(symbol="TEST", name="Test Corp"),
-            prices=[PriceBar(timestamp=1, close=100, volume=1000)],
+            prices=[
+                PriceBar(timestamp=index, close=100 + index, volume=1000 + index * 10)
+                for index in range(30)
+            ],
         )
         factors = calculate_factors(dataset)
         summary = build_evidence_summary(factors)
 
         self.assertIn("Momentum", summary)
-        self.assertIn("price_momentum", summary)
+        self.assertIn("return_20d", summary)
 
     def test_default_risks_marks_weak_data_quality(self) -> None:
         risks = default_risks("weak", ["TEST/yahoo_chart_prices: HTTP 429"])

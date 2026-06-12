@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from typing import Callable
 
 from backend.app.config.settings import Settings
 from backend.app.models.schemas import ScreeningResponse
-from backend.app.research.prompts import build_report_prompt
+from backend.app.research.prompts import build_agent_prompts, build_synthesis_prompt
 
 
 class LocalLLMError(RuntimeError):
@@ -21,23 +22,46 @@ class LocalLLMResearchWriter:
         self,
         screening: ScreeningResponse,
         horizons: tuple[str, ...],
+        progress: Callable[[str], None] | None = None,
     ) -> str:
-        prompt = build_report_prompt(screening, horizons)
-        return self._call_local_llm(prompt)
+        agent_outputs: dict[str, str] = {}
+        for agent_prompt in build_agent_prompts(screening, horizons):
+            if progress:
+                progress(f"calling agent: {agent_prompt.name}")
+            agent_outputs[agent_prompt.name] = self._call_local_llm(
+                agent_prompt.user_prompt,
+                system_prompt=agent_prompt.system_prompt,
+                progress=progress,
+                agent_name=agent_prompt.name,
+            )
+        synthesis_prompt = build_synthesis_prompt(screening, horizons, agent_outputs)
+        if progress:
+            progress("calling agent: final_research_writer")
+        return self._call_local_llm(
+            synthesis_prompt,
+            system_prompt=(
+                "你是最终研究写作智能体。你负责综合多个专业智能体的中间结论，"
+                "生成中文公开市场投资研究报告。只能基于提供的结构化证据和中间结论，"
+                "不得编造未提供的数据，不给确定性买卖建议。"
+            ),
+            progress=progress,
+            agent_name="final_research_writer",
+        )
 
-    def _call_local_llm(self, prompt: str) -> str:
+    def _call_local_llm(
+        self,
+        prompt: str,
+        system_prompt: str,
+        progress: Callable[[str], None] | None = None,
+        agent_name: str = "local_llm",
+    ) -> str:
         url = self.settings.local_llm_base_url.rstrip("/") + "/chat/completions"
         payload = {
             "model": self.settings.local_llm_model,
             "messages": [
                 {
                     "role": "system",
-                    "content": (
-                        "你是本地部署的公开市场投资研究智能体。"
-                        "只能基于用户提供的结构化证据生成中文研究报告。"
-                        "不要编造未提供的数据，不给确定性买卖建议。"
-                        "把输出定位为研究优先级和风险提示，而不是交易指令。"
-                    ),
+                    "content": system_prompt,
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -52,16 +76,21 @@ class LocalLLMResearchWriter:
             },
             method="POST",
         )
+        if progress:
+            progress(f"POST {url}; agent={agent_name}; model={self.settings.local_llm_model}")
         try:
             with urllib.request.urlopen(
                 request,
                 timeout=self.settings.local_llm_timeout_seconds,
             ) as response:
+                if progress:
+                    progress(f"local LLM HTTP {response.status}; reading response")
                 data = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace") if exc.fp else ""
             raise LocalLLMError(
                 f"Local LLM API returned HTTP {exc.code} at {url}. "
+                f"Requested model={self.settings.local_llm_model!r}. "
                 f"Check LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, and API key. {body[:300]}"
             ) from exc
         except (urllib.error.URLError, TimeoutError) as exc:

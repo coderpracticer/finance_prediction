@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Callable
 
 from backend.app.config.settings import Settings
 from backend.app.reports.markdown import render_markdown_report
@@ -29,15 +30,29 @@ class ReportPipeline:
         top_n: int = 10,
         horizons: tuple[str, ...] = ("short", "medium"),
         output_dir: Path | None = None,
+        progress: Callable[[str], None] | None = None,
     ) -> ReportArtifacts:
-        screening = ScreeningService(self.settings).run(limit=top_n)
+        report_progress = progress or (lambda _message: None)
+        report_progress(f"start screening; top_n={top_n}")
+        screening = ScreeningService(self.settings).run(limit=top_n, progress=report_progress)
         if not screening.candidates:
             raise RuntimeError("No candidates were generated. Check data source connectivity.")
 
+        report_progress(
+            f"screening completed; candidates={len(screening.candidates)}, "
+            f"warnings={len(screening.warnings)}"
+        )
+        report_progress(
+            "calling local LLM; this may take up to "
+            f"{self.settings.local_llm_timeout_seconds:.0f}s"
+        )
         llm_report = LocalLLMResearchWriter(self.settings).write_investment_report(
             screening=screening,
             horizons=horizons,
+            progress=report_progress,
         )
+        report_progress("local LLM returned report content")
+        report_progress("rendering Markdown and PDF")
         markdown_text = render_markdown_report(screening, llm_report, horizons)
 
         report_root = output_dir or self.settings.report_dir
@@ -47,6 +62,7 @@ class ReportPipeline:
         pdf_path = dated_dir / f"investment_report_{screening.run_id}.pdf"
         markdown_path.write_text(markdown_text, encoding="utf-8")
         render_pdf_from_markdown(markdown_text, pdf_path)
+        report_progress(f"artifacts written under {dated_dir}")
         return ReportArtifacts(
             run_id=screening.run_id,
             markdown_path=markdown_path,
