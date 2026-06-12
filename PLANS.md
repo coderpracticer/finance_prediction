@@ -29,11 +29,27 @@
 - [x] Run targeted unit tests.
 - [x] Run syntax validation.
 
+## Current Task: Make Reports More Detailed And Beginner-Friendly
+
+- [x] Review the latest China ETF report output.
+- [x] Confirm data fetching now has no source warnings.
+- [x] Rename `Structured Evidence` to a technical appendix with an explanation.
+- [x] Add a beginner reading guide to the Markdown report.
+- [x] Make the candidate summary table more readable.
+- [x] Replace US-market residual evidence text such as Nasdaq RSS and SEC companyfacts.
+- [x] Translate default risk notes into Chinese.
+- [x] Strengthen prompts for detailed beginner-friendly explanations and terminology definitions.
+- [x] Update report and factor tests.
+- [x] Run targeted unit tests.
+- [x] Run syntax validation.
+- [x] Run full unit tests.
+
 ## Next Technical Improvements
 
 - [ ] Add explicit multi-round committee orchestrator instead of simulating debate inside the synthesis prompt.
+- [ ] Add China ETF product metadata crawler for fund size, fee, tracking index, fund manager, listing date, and shares outstanding.
+- [ ] Add Chinese news, announcement, and policy event sources for ETF themes.
 - [ ] Add a second China ETF price provider fallback, such as Tencent or Sina, if Eastmoney is rate-limited.
-- [ ] Add ETF metadata crawler for fund size, tracking index, fee, and listing date.
 - [ ] Add optional JSON report artifact for downstream automation.
 - [ ] Add retry/backoff controls for public crawler sources.
 - [ ] Add simple ETF rotation backtest after live report quality is stable.

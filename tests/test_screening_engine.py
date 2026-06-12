@@ -89,11 +89,27 @@ class ScreeningEngineTests(unittest.TestCase):
         self.assertIn("Momentum", summary)
         self.assertIn("return_20d", summary)
 
+    def test_missing_china_etf_context_uses_neutral_evidence_text(self) -> None:
+        dataset = InstrumentDataset(
+            instrument=Instrument(symbol="510300", name="沪深300ETF"),
+            prices=[
+                PriceBar(timestamp=index, close=100 + index, volume=1000 + index * 10)
+                for index in range(30)
+            ],
+        )
+
+        evidence_text = "\n".join(factor.evidence for factor in calculate_factors(dataset))
+
+        self.assertIn("当前未接入或未抓到可用的中文新闻", evidence_text)
+        self.assertIn("当前未接入ETF规模", evidence_text)
+        self.assertNotIn("Nasdaq RSS", evidence_text)
+        self.assertNotIn("SEC companyfacts", evidence_text)
+
     def test_default_risks_marks_weak_data_quality(self) -> None:
         risks = default_risks("weak", ["TEST/yahoo_chart_prices: HTTP 429"])
 
-        self.assertTrue(any("data quality" in risk for risk in risks))
-        self.assertTrue(any("warnings" in risk for risk in risks))
+        self.assertTrue(any("数据质量" in risk for risk in risks))
+        self.assertTrue(any("数据源警告" in risk for risk in risks))
 
 
 if __name__ == "__main__":

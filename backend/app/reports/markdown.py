@@ -5,6 +5,22 @@ from datetime import UTC, datetime
 from backend.app.models.schemas import ScreeningResponse
 
 
+FACTOR_GROUP_LABELS = {
+    "Data Coverage": "数据覆盖",
+    "Momentum": "趋势动量",
+    "Risk": "风险波动",
+    "Volume/Attention": "成交关注度",
+    "Event/Catalyst": "事件催化",
+    "Quality": "产品资料",
+}
+
+DATA_QUALITY_LABELS = {
+    "good": "较好",
+    "mixed": "一般",
+    "weak": "较弱",
+}
+
+
 def render_markdown_report(
     screening: ScreeningResponse,
     llm_report: str,
@@ -12,33 +28,35 @@ def render_markdown_report(
 ) -> str:
     generated_at = datetime.now(UTC).isoformat(timespec="seconds")
     table_rows = "\n".join(
-        "| {rank} | {symbol} | {score:.2f} | {confidence:.2f} | {quality} |".format(
+        "| {rank} | {symbol} | {name} | {score:.2f} | {confidence:.2f} | {quality} |".format(
             rank=candidate.rank,
             symbol=candidate.symbol,
+            name=candidate.name,
             score=candidate.opportunity_score,
             confidence=candidate.confidence,
-            quality=candidate.data_quality,
+            quality=DATA_QUALITY_LABELS.get(candidate.data_quality, candidate.data_quality),
         )
         for candidate in screening.candidates
     )
-    warnings = "\n".join(f"- {warning}" for warning in screening.warnings) or "- None"
+    warnings = "\n".join(f"- {warning}" for warning in screening.warnings) or "- 无"
     warning_summary = summarize_warnings(screening.warnings)
     factor_sections = "\n\n".join(
         "\n".join(
             [
                 f"### {candidate.rank}. {candidate.symbol} {candidate.name}",
-                f"- Market: {candidate.market}",
-                f"- Opportunity score: {candidate.opportunity_score:.2f}",
-                f"- Confidence: {candidate.confidence:.2f}",
-                f"- Data quality: {candidate.data_quality}",
-                f"- Evidence summary: {candidate.thesis}",
-                f"- Risks: {'; '.join(candidate.risks)}",
+                f"- 市场：{candidate.market}",
+                f"- 机会分：{candidate.opportunity_score:.2f}",
+                f"- 置信度：{candidate.confidence:.2f}",
+                f"- 数据质量：{DATA_QUALITY_LABELS.get(candidate.data_quality, candidate.data_quality)}",
+                f"- 证据摘要：{candidate.thesis}",
+                f"- 已知风险：{'；'.join(candidate.risks)}",
                 "",
-                "| Group | Factor | Score | Confidence | Raw Value | Evidence |",
+                "| 因子组 | 因子 | 分数 | 置信度 | 原始值 | 证据说明 |",
                 "| --- | --- | ---: | ---: | ---: | --- |",
                 *[
                     (
-                        f"| {factor.group} | {factor.name} | {factor.score:.1f} | "
+                        f"| {FACTOR_GROUP_LABELS.get(factor.group, factor.group)} | "
+                        f"{factor.name} | {factor.score:.1f} | "
                         f"{factor.confidence:.2f} | {factor.raw_value if factor.raw_value is not None else '-'} | "
                         f"{factor.evidence} |"
                     )
@@ -49,32 +67,47 @@ def render_markdown_report(
         for candidate in screening.candidates
     )
     return (
-        "# 中国ETF风格轮动研究报告\n\n"
-        f"- Generated at: {generated_at}\n"
-        f"- Screening run: {screening.run_id}\n"
-        f"- Horizons: {', '.join(horizons)}\n"
-        f"- Candidate count: {len(screening.candidates)}\n\n"
-        "## Data Source Health\n\n"
+        "# 中国ETF专业投资研究报告\n\n"
+        f"- 生成时间：{generated_at}\n"
+        f"- 运行编号：{screening.run_id}\n"
+        f"- 研究周期：{', '.join(horizons)}\n"
+        f"- 候选数量：{len(screening.candidates)}\n\n"
+        "## 新手阅读指南\n\n"
+        "- 先看“智能体研究报告”的总体结论，确认当前适合积极配置、观察，还是暂缓。\n"
+        "- 再看“候选标的速览”，把机会分、置信度和数据质量放在一起判断，不要只看排名。\n"
+        "- 最后看“技术附录：因子证据表”。附录是给结论溯源用的，不需要逐项背公式。\n"
+        "- 仓位区间是风险控制参考，不是适合每个人的个性化配置比例。\n\n"
+        "## 数据来源概况\n\n"
         f"{warning_summary}\n\n"
-        "## LLM Research Summary\n\n"
+        "## 智能体研究报告\n\n"
         f"{strip_reasoning_blocks(llm_report).strip()}\n\n"
-        "## Ranked Candidates\n\n"
-        "| Rank | Symbol | Opportunity Score | Confidence | Data Quality |\n"
-        "| ---: | --- | ---: | ---: | --- |\n"
+        "## 候选标的速览\n\n"
+        "| 排名 | 代码 | 名称 | 机会分 | 置信度 | 数据质量 |\n"
+        "| ---: | --- | --- | ---: | ---: | --- |\n"
         f"{table_rows}\n\n"
-        "## Structured Evidence\n\n"
+        "## 技术附录：因子证据表\n\n"
+        "这一部分原名 `Structured Evidence`，意思是“结构化证据”。"
+        "它记录系统为什么给某个 ETF 打分，例如近期涨跌幅、波动率、最大回撤和成交量变化。"
+        "它主要用于复核报告，不是给新手投资者直接做买卖判断的主内容。\n\n"
+        "### 术语速查\n\n"
+        "- 机会分：系统把趋势、风险、成交活跃度和数据覆盖度合成后的相对排序分数。\n"
+        "- 置信度：当前数据能支撑结论的程度，越低越应该保守。\n"
+        "- 最大回撤：最近一段时间从高点跌到低点的最大跌幅，用来观察可能承受的亏损压力。\n"
+        "- 年化波动率：价格上下波动的剧烈程度，越高越需要降低仓位。\n"
+        "- 成交关注度：近期成交量相对历史水平是否放大，放大通常代表市场关注度上升。\n\n"
         f"{factor_sections}\n\n"
-        "## Data Source Warnings\n\n"
+        "## 数据源警告明细\n\n"
         f"{warnings}\n\n"
-        "## Important Notice\n\n"
-        "This report is generated from free public data and a local LLM for China ETF research "
-        "triage only. It is not financial advice, a recommendation, or an automated trading signal.\n"
+        "## 重要声明\n\n"
+        "本报告基于公开数据和本地大模型自动生成，仅供一般性研究参考，"
+        "不构成个性化投资建议、收益承诺或自动交易信号。投资者应结合自身风险承受能力、"
+        "投资期限和财务状况独立决策，必要时咨询持牌专业人士。\n"
     )
 
 
 def summarize_warnings(warnings: list[str]) -> str:
     if not warnings:
-        return "- No data source warnings."
+        return "- 本次运行没有数据源错误或警告。"
     source_counts: dict[str, int] = {}
     cache_count = 0
     for warning in warnings:
@@ -84,8 +117,8 @@ def summarize_warnings(warnings: list[str]) -> str:
         source = parts[1] if len(parts) > 1 else "unknown"
         source_counts[source] = source_counts.get(source, 0) + 1
     lines = [
-        f"- Total warnings: {len(warnings)}",
-        f"- Cached fallbacks used: {cache_count}",
+        f"- 数据源警告总数：{len(warnings)}",
+        f"- 使用缓存兜底次数：{cache_count}",
     ]
     for source, count in sorted(source_counts.items()):
         lines.append(f"- {source}: {count}")

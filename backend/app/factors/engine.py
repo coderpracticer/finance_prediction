@@ -33,8 +33,8 @@ def _data_coverage_factors(
             confidence=0.9,
             raw_value=len(prices),
             evidence=(
-                f"Price rows={len(prices)}, news items={len(news)}, "
-                f"SEC snapshot={'yes' if fundamentals is not None else 'no'}."
+                f"价格序列={len(prices)}条，新闻/公告线索={len(news)}条，"
+                f"产品或基本面资料={'有' if fundamentals is not None else '暂无'}。"
             ),
         )
     ]
@@ -67,8 +67,8 @@ def _momentum_factors(prices: list[PriceBar]) -> list[FactorScore]:
                 confidence=0.85,
                 raw_value=round(raw_return, 2),
                 evidence=(
-                    f"{lookback_days}-day return {raw_return:.2f}%; "
-                    f"latest close {latest:.2f}, lookback close {lookback:.2f}."
+                    f"近{lookback_days}个交易日收益率 {raw_return:.2f}%；"
+                    f"最新收盘价 {latest:.2f}，对比基准价 {lookback:.2f}。"
                 ),
             )
         )
@@ -85,8 +85,8 @@ def _momentum_factors(prices: list[PriceBar]) -> list[FactorScore]:
                 confidence=0.8,
                 raw_value=round(distance, 2),
                 evidence=(
-                    f"Latest close is {distance:.2f}% from the {window}-day average "
-                    f"({average:.2f})."
+                    f"最新收盘价相对{window}日均线偏离 {distance:.2f}%，"
+                    f"{window}日均线为 {average:.2f}。"
                 ),
             )
         )
@@ -100,7 +100,7 @@ def _momentum_factors(prices: list[PriceBar]) -> list[FactorScore]:
                 score=clamp(50 + raw_return * 2, 0, 100),
                 confidence=0.45,
                 raw_value=round(raw_return, 2),
-                evidence=f"Short available-history return {raw_return:.2f}%.",
+                evidence=f"可用短历史区间收益率 {raw_return:.2f}%。",
             )
         )
     return factors
@@ -115,7 +115,7 @@ def _risk_factors(prices: list[PriceBar]) -> list[FactorScore]:
                 group="Risk",
                 score=25,
                 confidence=0.75,
-                evidence="Not enough price history to estimate volatility or drawdown.",
+                evidence="价格历史不足，无法可靠估计波动率和最大回撤。",
             )
         ]
     factors: list[FactorScore] = []
@@ -131,7 +131,7 @@ def _risk_factors(prices: list[PriceBar]) -> list[FactorScore]:
                 score=clamp(80 - volatility, 0, 100),
                 confidence=0.75 if len(returns) >= window else 0.55,
                 raw_value=round(volatility, 2),
-                evidence=f"Annualized volatility over {len(sample)} daily returns is {volatility:.2f}%.",
+                evidence=f"基于近{len(sample)}个日收益率估算的年化波动率为 {volatility:.2f}%。",
             )
         )
     drawdown_window = prices[-60:] if len(prices) >= 60 else prices
@@ -144,8 +144,7 @@ def _risk_factors(prices: list[PriceBar]) -> list[FactorScore]:
             confidence=0.75 if len(prices) >= 60 else 0.55,
             raw_value=round(max_drawdown, 2),
             evidence=(
-                f"Maximum drawdown over {len(drawdown_window)} available price rows is "
-                f"{max_drawdown:.2f}%."
+                f"近{len(drawdown_window)}条可用价格记录中的最大回撤为 {max_drawdown:.2f}%。"
             ),
         )
     )
@@ -159,7 +158,7 @@ def _risk_factors(prices: list[PriceBar]) -> list[FactorScore]:
                 score=clamp(80 - downside_volatility, 0, 100),
                 confidence=0.65,
                 raw_value=round(downside_volatility, 2),
-                evidence=f"Downside annualized volatility is {downside_volatility:.2f}%.",
+                evidence=f"只统计下跌日后的年化下行波动率为 {downside_volatility:.2f}%。",
             )
         )
     return factors
@@ -174,7 +173,7 @@ def _volume_factors(prices: list[PriceBar]) -> list[FactorScore]:
                 group="Volume/Attention",
                 score=50,
                 confidence=0.25,
-                evidence="Not enough volume history.",
+                evidence="成交量历史不足，无法可靠判断近期关注度变化。",
             )
         ]
     recent = sum(volumes[-5:]) / min(5, len(volumes))
@@ -189,7 +188,7 @@ def _volume_factors(prices: list[PriceBar]) -> list[FactorScore]:
             score=score,
             confidence=0.8,
             raw_value=round(ratio, 3),
-            evidence=f"5-day average volume is {ratio:.2f}x the baseline window.",
+            evidence=f"近5日平均成交量为基准区间的 {ratio:.2f} 倍。",
         )
     ]
 
@@ -200,9 +199,9 @@ def _event_factors(news: list[NewsItem]) -> list[FactorScore]:
     confidence = 0.75 if count else 0.3
     titles = [item.title for item in news[:3] if item.title]
     if titles:
-        evidence = f"{count} recent Nasdaq RSS items were found. Sample titles: " + " | ".join(titles)
+        evidence = f"发现{count}条近期新闻/公告线索，样例标题：" + " | ".join(titles)
     else:
-        evidence = f"{count} recent Nasdaq RSS items were found. No titles were provided."
+        evidence = "当前未接入或未抓到可用的中文新闻、公告或政策线索。"
     return [
         FactorScore(
             name="news_attention",
@@ -225,7 +224,7 @@ def _fundamental_availability_factors(
                 group="Quality",
                 score=35,
                 confidence=0.25,
-                evidence="No SEC companyfacts snapshot is available.",
+                evidence="当前未接入ETF规模、费率、跟踪指数、持仓或份额变化等产品资料。",
             )
         ]
     coverage = sum(
@@ -239,7 +238,7 @@ def _fundamental_availability_factors(
             score=score,
             confidence=0.7,
             raw_value=coverage,
-            evidence=f"{coverage}/3 common SEC metrics are available.",
+            evidence=f"已获得 {coverage}/3 项核心产品或基本面资料。",
         )
     ]
 

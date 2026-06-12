@@ -35,7 +35,7 @@ def sample_screening() -> ScreeningResponse:
                     )
                 ],
                 thesis="Momentum evidence is constructive.",
-                risks=["Free public data can be delayed."],
+                risks=["免费公开数据可能存在延迟。"],
             )
         ],
     )
@@ -53,6 +53,8 @@ class ReportTests(unittest.TestCase):
         self.assertIn("投资委员会评级", prompt)
         self.assertIn("仓位区间", prompt)
         self.assertIn("不构成个性化投资建议", prompt)
+        self.assertIn("新手投资者", prompt)
+        self.assertIn("术语解释", prompt)
 
     def test_agent_prompts_define_professional_investment_team_roles(self) -> None:
         prompts = build_agent_prompts(sample_screening(), ("short", "medium"))
@@ -85,6 +87,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("投资委员会主席", prompt)
         self.assertIn("合规审查", prompt)
         self.assertIn("0%-5%", prompt)
+        self.assertIn("新手先看", prompt)
 
     def test_markdown_report_contains_ranked_table_and_notice(self) -> None:
         markdown = render_markdown_report(
@@ -93,9 +96,12 @@ class ReportTests(unittest.TestCase):
             ("short", "medium"),
         )
 
-        self.assertIn("# 中国ETF风格轮动研究报告", markdown)
-        self.assertIn("| 1 | 510300 |", markdown)
-        self.assertIn("not financial advice", markdown)
+        self.assertIn("# 中国ETF专业投资研究报告", markdown)
+        self.assertIn("## 新手阅读指南", markdown)
+        self.assertIn("| 1 | 510300 | 沪深300ETF |", markdown)
+        self.assertIn("## 技术附录：因子证据表", markdown)
+        self.assertIn("结构化证据", markdown)
+        self.assertIn("不构成个性化投资建议", markdown)
 
     def test_reasoning_blocks_are_removed(self) -> None:
         content = "<think>hidden reasoning</think>\n## 报告正文"

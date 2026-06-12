@@ -53,6 +53,20 @@
   - warnings referenced Yahoo, Nasdaq, SEC, and Alpha Vantage
   - this matches `configs/data_source_spike.json`, not `configs/china_etf_rotation.json`
 - Added runtime progress logging for active config, raw directory, report directory, and universe sample.
+- Reviewed the latest China ETF report:
+  - data source health showed no warnings
+  - the report used China ETF symbols
+  - the main quality issue was readability and missing non-price data, not crawler failure
+- Improved report readability:
+  - renamed `Structured Evidence` to a Chinese technical appendix
+  - added a beginner reading guide
+  - added terminology explanations for score, confidence, drawdown, volatility, and volume attention
+  - made the candidate table include ETF names and Chinese labels
+- Replaced US-market residual evidence wording:
+  - removed Nasdaq RSS wording from no-news evidence
+  - removed SEC companyfacts wording from missing product/fundamental evidence
+  - translated default risk notes into Chinese
+- Strengthened final report prompts for more detailed beginner-friendly ETF analysis.
 - Rewrote corrupted Chinese prompt/documentation text.
 - Simplified run docs:
   - `README.md`
@@ -68,7 +82,13 @@
 1. On the Linux server, generate a new report:
    - `python -m backend.app.cli generate-report --top-n 10`
 2. Inspect whether `Data Source Health` shows enough price coverage.
-3. Check whether the generated report now includes investment committee rating, action, sizing, risk, and disclaimer.
+3. Check whether the generated report now includes:
+   - beginner reading guide
+   - longer and clearer ETF explanations
+   - investment committee rating
+   - action and sizing
+   - risk and first failure condition
+   - Chinese technical appendix instead of `Structured Evidence`
 4. Confirm startup logs show:
    - `config=configs/china_etf_rotation.json`
    - `sample=[510050:CN, 510300:CN, ...]`
@@ -82,7 +102,8 @@
 ## Validation Results
 
 - `.\.venv\Scripts\python.exe -m unittest tests.test_reports`: 8 tests passed.
-- `.\.venv\Scripts\python.exe -m unittest discover -s tests`: 25 tests passed.
+- `.\.venv\Scripts\python.exe -m unittest tests.test_reports tests.test_screening_engine`: 14 tests passed.
+- `.\.venv\Scripts\python.exe -m unittest discover -s tests`: 26 tests passed.
 - `.\.venv\Scripts\python.exe -m compileall backend`: passed.
 - Default config smoke test loaded `configs/china_etf_rotation.json` with 15 CN instruments.
 - Live Eastmoney smoke test fetched `510050` with 2535 daily price rows.

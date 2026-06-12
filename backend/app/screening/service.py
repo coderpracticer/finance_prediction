@@ -127,11 +127,11 @@ def build_evidence_summary(factors: list[FactorScore]) -> str:
 
 def default_risks(data_quality: str, warnings: list[str]) -> list[str]:
     risks = [
-        "Free public data can be delayed, incomplete, rate-limited, or changed without notice.",
-        "The screen is a research-priority tool and is not a buy/sell recommendation.",
+        "免费公开数据可能存在延迟、缺失、限流或接口变更。",
+        "当前筛选结果只是研究参考，不是确定性买卖建议。",
     ]
     if data_quality != "good":
-        risks.append("Current data quality is not strong enough for a high-conviction conclusion.")
+        risks.append("当前数据质量不足以支撑高置信度结论。")
     if warnings:
-        risks.append("Some data sources produced warnings during this run.")
+        risks.append("本次运行存在数据源警告，需要降低结论强度。")
     return risks
