@@ -1,6 +1,6 @@
 # Server Command Runbook
 
-这份 runbook 只保留服务器上最短可执行路径：先启动 `vLLM`，再运行项目。
+这份 runbook 只保留服务器上最短可执行路径：启动 `vLLM`，安装项目，生成中国ETF研究报告。
 
 ## 1. 检查环境
 
@@ -22,7 +22,7 @@ uv available
 
 ```bash
 python -m vllm.entrypoints.openai.api_server \
-  --model /path/to/your/model \
+  --model /home/ma-user/work/dataset/harness_summary/models/Qwen8B \
   --served-model-name Qwen/Qwen2.5-1.5B-Instruct \
   --host 0.0.0.0 \
   --port 8001 \
@@ -35,12 +35,6 @@ python -m vllm.entrypoints.openai.api_server \
 
 ```bash
 curl http://127.0.0.1:8001/v1/models
-```
-
-项目只要求兼容：
-
-```text
-POST /v1/chat/completions
 ```
 
 ## 3. 安装项目
@@ -56,13 +50,13 @@ uv pip install -e .
 ## 4. 配置 `.env`
 
 ```bash
-FRA_CONFIG_PATH=configs/data_source_spike.json
+FRA_CONFIG_PATH=configs/china_etf_rotation.json
 FRA_DATABASE_PATH=data/app.db
 FRA_RAW_DIR=data/raw/mvp
 FRA_REPORT_DIR=reports
-
-SEC_USER_AGENT=FinancialResearchAgent/0.1 your-email@example.com
-ALPHA_VANTAGE_API_KEY=
+FRA_REQUIRE_PRICE_HISTORY=true
+FRA_MIN_PRICE_ROWS=60
+FRA_MIN_PRICE_COVERAGE_RATIO=0.8
 
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
 LOCAL_LLM_API_KEY=local
@@ -70,7 +64,13 @@ LOCAL_LLM_MODEL=Qwen/Qwen2.5-1.5B-Instruct
 LOCAL_LLM_TIMEOUT_SECONDS=180
 ```
 
-`LOCAL_LLM_MODEL` 必须等于 `curl http://127.0.0.1:8001/v1/models` 返回的模型 `id`。最简单做法是在启动 vLLM 时使用 `--served-model-name`，并把 `.env` 写成同一个值。
+`LOCAL_LLM_MODEL` 必须等于：
+
+```bash
+curl http://127.0.0.1:8001/v1/models
+```
+
+返回的模型 `id`。
 
 ## 5. 生成报告
 
@@ -88,14 +88,7 @@ markdown=reports/YYYY-MM-DD/investment_report_....md
 pdf=reports/YYYY-MM-DD/investment_report_....pdf
 ```
 
-## 6. 本地验证
-
-```bash
-python -m unittest discover -s tests
-python -m compileall backend
-```
-
-## 7. 排错
+## 6. 排错
 
 LLM API 没连上：
 
@@ -106,6 +99,14 @@ echo $LOCAL_LLM_MODEL
 unset LOCAL_LLM_MODEL
 ```
 
+价格数据不足：
+
+```bash
+python -m backend.app.cli generate-report --top-n 10 --allow-weak-price-data
+```
+
+如果加上 `--allow-weak-price-data` 才能生成，说明价格源没有稳定拿到足够日线数据，报告只能用于诊断。
+
 依赖问题：
 
 ```bash
@@ -113,14 +114,9 @@ source .venv/bin/activate
 uv pip install -e .
 ```
 
-数据源失败：
+本地验证：
 
 ```bash
-python -m backend.app.data_sources.probe AAPL
-```
-
-报告路径：
-
-```bash
-find reports -maxdepth 3 -type f | sort | tail
+python -m unittest discover -s tests
+python -m compileall backend
 ```

@@ -41,8 +41,9 @@ class LocalLLMResearchWriter:
             synthesis_prompt,
             system_prompt=(
                 "你是最终研究写作智能体。你负责综合多个专业智能体的中间结论，"
-                "生成中文公开市场投资研究报告。只能基于提供的结构化证据和中间结论，"
-                "不得编造未提供的数据，不给确定性买卖建议，不要输出 <think> 或内部推理草稿。"
+                "生成中文A股和中国ETF投资研究报告。只能基于提供的结构化证据和中间结论，"
+                "不得编造未提供的数据，不做美股个股预测，不给确定性买卖建议，"
+                "不要输出 <think> 或内部推理草稿。"
             ),
             progress=progress,
             agent_name="final_research_writer",

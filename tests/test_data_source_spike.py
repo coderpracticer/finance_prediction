@@ -8,12 +8,15 @@ from backend.app.data_sources.spike import (
     status_from,
 )
 from backend.app.data_sources.connectors import (
+    parse_eastmoney_kline_prices,
     parse_date_timestamp,
     parse_local_price_csv,
     parse_nasdaq_historical_prices,
     parse_optional_float,
     parse_yahoo_price_bars,
+    resolve_eastmoney_secid,
 )
+from backend.app.models.schemas import Instrument
 
 
 class DataSourceSpikeTests(unittest.TestCase):
@@ -155,6 +158,34 @@ class DataSourceSpikeTests(unittest.TestCase):
         self.assertEqual(len(prices), 2)
         self.assertEqual(prices[-1].close, 104)
         self.assertEqual(prices[-1].volume, 1200)
+
+    def test_parse_eastmoney_kline_prices_returns_usable_prices(self) -> None:
+        payload = json.dumps(
+            {
+                "data": {
+                    "klines": [
+                        "2026-06-10,3.000,3.100,3.120,2.980,100000,310000000,4.1,2.0,0.06,1.2",
+                        "2026-06-11,3.100,3.200,3.240,3.080,120000,384000000,5.0,3.2,0.10,1.4",
+                    ]
+                }
+            }
+        ).encode("utf-8")
+
+        prices = parse_eastmoney_kline_prices(payload)
+
+        self.assertEqual(len(prices), 2)
+        self.assertEqual(prices[-1].close, 3.2)
+        self.assertEqual(prices[-1].volume, 120000)
+
+    def test_resolve_eastmoney_secid_handles_cn_etfs(self) -> None:
+        self.assertEqual(
+            resolve_eastmoney_secid(Instrument(symbol="510300", name="沪深300ETF")),
+            "1.510300",
+        )
+        self.assertEqual(
+            resolve_eastmoney_secid(Instrument(symbol="159915", name="创业板ETF")),
+            "0.159915",
+        )
 
     def test_status_from_classifies_results(self) -> None:
         self.assertEqual(status_from([], [], 10), "passed")

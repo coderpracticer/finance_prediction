@@ -49,7 +49,7 @@ def render_markdown_report(
         for candidate in screening.candidates
     )
     return (
-        "# Investment Research Report\n\n"
+        "# 中国ETF风格轮动研究报告\n\n"
         f"- Generated at: {generated_at}\n"
         f"- Screening run: {screening.run_id}\n"
         f"- Horizons: {', '.join(horizons)}\n"
@@ -67,8 +67,8 @@ def render_markdown_report(
         "## Data Source Warnings\n\n"
         f"{warnings}\n\n"
         "## Important Notice\n\n"
-        "This report is generated from free public data and a local LLM for research triage only. "
-        "It is not financial advice, a recommendation, or an automated trading signal.\n"
+        "This report is generated from free public data and a local LLM for China ETF research "
+        "triage only. It is not financial advice, a recommendation, or an automated trading signal.\n"
     )
 
 

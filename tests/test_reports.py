@@ -15,12 +15,12 @@ def sample_screening() -> ScreeningResponse:
     return ScreeningResponse(
         run_id="run-1",
         status="success",
-        warnings=["AAPL/news: timeout"],
+        warnings=["510300/eastmoney_kline_prices: timeout"],
         candidates=[
             Candidate(
-                symbol="AAPL",
-                name="Apple Inc.",
-                market="US",
+                symbol="510300",
+                name="沪深300ETF",
+                market="CN",
                 rank=1,
                 opportunity_score=72.3,
                 confidence=0.81,
@@ -46,16 +46,18 @@ class ReportTests(unittest.TestCase):
         prompt = build_report_prompt(sample_screening(), ("short", "medium"))
 
         self.assertIn("short, medium", prompt)
-        self.assertIn("AAPL", prompt)
+        self.assertIn("510300", prompt)
         self.assertIn("第一否定条件", prompt)
         self.assertIn("数据质量审计智能体", prompt)
-        self.assertIn("角色边界", prompt)
+        self.assertIn("中国ETF风格轮动智能体", prompt)
+        self.assertIn("不做美股个股预测", prompt)
 
     def test_agent_prompts_define_lightweight_roles(self) -> None:
         prompts = build_agent_prompts(sample_screening(), ("short", "medium"))
         names = {prompt.name for prompt in prompts}
 
         self.assertIn("data_quality_auditor", names)
+        self.assertIn("china_etf_style_rotation_analyst", names)
         self.assertIn("momentum_technical_analyst", names)
         self.assertIn("risk_challenger", names)
         self.assertIn("opportunity_scout", names)
@@ -64,12 +66,12 @@ class ReportTests(unittest.TestCase):
         prompt = build_synthesis_prompt(
             sample_screening(),
             ("short", "medium"),
-            {"risk_challenger": "主要风险是数据缺口。"},
+            {"risk_challenger": "主要风险是价格数据缺口。"},
         )
 
         self.assertIn("多智能体中间结论", prompt)
         self.assertIn("risk_challenger", prompt)
-        self.assertIn("主要风险是数据缺口", prompt)
+        self.assertIn("主要风险是价格数据缺口。", prompt)
 
     def test_markdown_report_contains_ranked_table_and_notice(self) -> None:
         markdown = render_markdown_report(
@@ -78,8 +80,8 @@ class ReportTests(unittest.TestCase):
             ("short", "medium"),
         )
 
-        self.assertIn("# Investment Research Report", markdown)
-        self.assertIn("| 1 | AAPL |", markdown)
+        self.assertIn("# 中国ETF风格轮动研究报告", markdown)
+        self.assertIn("| 1 | 510300 |", markdown)
         self.assertIn("not financial advice", markdown)
 
     def test_reasoning_blocks_are_removed(self) -> None:

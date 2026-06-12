@@ -8,8 +8,9 @@ from typing import Any
 class Instrument:
     symbol: str
     name: str
-    market: str = "US"
+    market: str = "CN"
     stooq_symbol: str | None = None
+    eastmoney_secid: str | None = None
     cik: str | None = None
 
 

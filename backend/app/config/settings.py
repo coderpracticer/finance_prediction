@@ -13,7 +13,7 @@ load_dotenv()
 @dataclass(frozen=True)
 class Settings:
     app_name: str = "Financial Research Agent"
-    config_path: Path = Path("configs/data_source_spike.json")
+    config_path: Path = Path("configs/china_etf_rotation.json")
     database_path: Path = Path("data/app.db")
     raw_dir: Path = Path("data/raw/mvp")
     report_dir: Path = Path("reports")
@@ -30,7 +30,7 @@ class Settings:
 def get_settings() -> Settings:
     price_csv_dir = os.getenv("FRA_PRICE_CSV_DIR")
     return Settings(
-        config_path=Path(os.getenv("FRA_CONFIG_PATH", "configs/data_source_spike.json")),
+        config_path=Path(os.getenv("FRA_CONFIG_PATH", "configs/china_etf_rotation.json")),
         database_path=Path(os.getenv("FRA_DATABASE_PATH", "data/app.db")),
         raw_dir=Path(os.getenv("FRA_RAW_DIR", "data/raw/mvp")),
         report_dir=Path(os.getenv("FRA_REPORT_DIR", "reports")),

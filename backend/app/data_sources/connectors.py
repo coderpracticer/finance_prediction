@@ -79,6 +79,19 @@ class DataSourceClient:
                 )
 
         try:
+            if not prices and source_enabled(source_config, "eastmoney_kline_prices"):
+                if progress:
+                    progress(f"{instrument.symbol}: fetching Eastmoney kline prices")
+                prices = self.fetch_eastmoney_kline_prices(
+                    instrument,
+                    source_config["eastmoney_kline_prices"],
+                )
+                if progress:
+                    progress(f"{instrument.symbol}: Eastmoney kline rows={len(prices)}")
+        except Exception as eastmoney_exc:  # noqa: BLE001
+            warnings.append(source_warning(instrument.symbol, "eastmoney_kline_prices", eastmoney_exc))
+
+        try:
             if prices:
                 raise SkipPriceNetworkFetch()
             if not source_enabled(source_config, "yahoo_chart_prices"):
@@ -145,29 +158,30 @@ class DataSourceClient:
             elif progress:
                 progress(f"{instrument.symbol}: no cached price snapshot found")
 
-        try:
-            if progress:
-                progress(f"{instrument.symbol}: fetching Nasdaq RSS")
-            news = self.fetch_nasdaq_news(instrument, source_config["nasdaq_stock_rss"])
-            if progress:
-                progress(f"{instrument.symbol}: Nasdaq RSS items={len(news)}")
-        except Exception as exc:  # noqa: BLE001
-            warnings.append(source_warning(instrument.symbol, "nasdaq_stock_rss", exc))
-            if progress:
-                progress(f"{instrument.symbol}: Nasdaq RSS failed: {type(exc).__name__}: {exc}")
-            cached_news = self.load_cached_news(instrument)
-            if cached_news is not None:
-                news, snapshot_path = cached_news
-                warnings.append(
-                    f"{instrument.symbol}/news_cache: using cached snapshot {snapshot_path.name}"
-                )
+        if source_enabled(source_config, "nasdaq_stock_rss"):
+            try:
                 if progress:
-                    progress(
-                        f"{instrument.symbol}: using cached news items={len(news)} "
-                        f"from {snapshot_path.name}"
+                    progress(f"{instrument.symbol}: fetching Nasdaq RSS")
+                news = self.fetch_nasdaq_news(instrument, source_config["nasdaq_stock_rss"])
+                if progress:
+                    progress(f"{instrument.symbol}: Nasdaq RSS items={len(news)}")
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(source_warning(instrument.symbol, "nasdaq_stock_rss", exc))
+                if progress:
+                    progress(f"{instrument.symbol}: Nasdaq RSS failed: {type(exc).__name__}: {exc}")
+                cached_news = self.load_cached_news(instrument)
+                if cached_news is not None:
+                    news, snapshot_path = cached_news
+                    warnings.append(
+                        f"{instrument.symbol}/news_cache: using cached snapshot {snapshot_path.name}"
                     )
+                    if progress:
+                        progress(
+                            f"{instrument.symbol}: using cached news items={len(news)} "
+                            f"from {snapshot_path.name}"
+                        )
 
-        if instrument.cik:
+        if instrument.cik and source_enabled(source_config, "sec_companyfacts"):
             try:
                 if progress:
                     progress(f"{instrument.symbol}: fetching SEC companyfacts")
@@ -197,6 +211,29 @@ class DataSourceClient:
             fundamentals=fundamentals,
             warnings=warnings,
         )
+
+    def fetch_eastmoney_kline_prices(
+        self,
+        instrument: Instrument,
+        config: dict[str, Any],
+    ) -> list[PriceBar]:
+        secid = resolve_eastmoney_secid(instrument)
+        url = config["url_template"].format(
+            secid=secid,
+            klt=config.get("klt", "101"),
+            fqt=config.get("fqt", "1"),
+            beg=config.get("beg", "20160101"),
+            end=config.get("end", "20500101"),
+        )
+        payload = _fetch(
+            url,
+            {
+                "Accept": "application/json, text/plain, */*",
+                "Referer": "https://quote.eastmoney.com/",
+            },
+        )
+        save_snapshot(self.raw_dir, "eastmoney_kline_prices", instrument.symbol, payload, "json")
+        return parse_eastmoney_kline_prices(payload)
 
     def load_local_csv_prices(self, instrument: Instrument) -> tuple[list[PriceBar], Path] | None:
         if self.price_csv_dir is None:
@@ -332,6 +369,7 @@ class DataSourceClient:
 
     def load_cached_prices(self, instrument: Instrument) -> tuple[list[PriceBar], Path] | None:
         for source_name, suffix, parser in (
+            ("eastmoney_kline_prices", "json", parse_eastmoney_kline_prices),
             ("yahoo_chart_prices", "json", parse_yahoo_price_bars),
             ("nasdaq_historical_prices", "json", parse_nasdaq_historical_prices),
             ("stooq_prices", "csv", lambda payload: parse_stooq_price_bars(payload.decode("utf-8"))),
@@ -456,6 +494,38 @@ def parse_nasdaq_historical_prices(payload: bytes) -> list[PriceBar]:
     return bars
 
 
+def parse_eastmoney_kline_prices(payload: bytes) -> list[PriceBar]:
+    data = json.loads(payload.decode("utf-8"))
+    klines = data.get("data", {}).get("klines")
+    if not isinstance(klines, list) or not klines:
+        raise RuntimeError("Eastmoney kline API returned no usable kline rows.")
+    bars: list[PriceBar] = []
+    for item in klines:
+        if not isinstance(item, str):
+            continue
+        parts = item.split(",")
+        if len(parts) < 7:
+            continue
+        date_text, open_text, close_text, high_text, low_text, volume_text = parts[:6]
+        close = parse_optional_float(close_text)
+        if close is None:
+            continue
+        bars.append(
+            PriceBar(
+                timestamp=parse_date_timestamp(date_text),
+                open=parse_optional_float(open_text),
+                high=parse_optional_float(high_text),
+                low=parse_optional_float(low_text),
+                close=close,
+                volume=parse_optional_float(volume_text),
+            )
+        )
+    bars.sort(key=lambda bar: bar.timestamp)
+    if not bars:
+        raise RuntimeError("Eastmoney kline API returned no parseable price rows.")
+    return bars
+
+
 def parse_stooq_price_bars(text: str) -> list[PriceBar]:
     import csv
 
@@ -574,6 +644,19 @@ def parse_flexible_timestamp(value: str) -> int:
         except ValueError:
             pass
     raise ValueError(f"Unsupported date format: {value}")
+
+
+def resolve_eastmoney_secid(instrument: Instrument) -> str:
+    if instrument.eastmoney_secid:
+        return instrument.eastmoney_secid
+    symbol = instrument.symbol.strip()
+    if not symbol.isdigit():
+        raise RuntimeError("Instrument has no eastmoney_secid and symbol is not numeric.")
+    if symbol.startswith(("5", "6", "9")):
+        return f"1.{symbol}"
+    if symbol.startswith(("0", "1", "2", "3")):
+        return f"0.{symbol}"
+    raise RuntimeError(f"Cannot infer Eastmoney secid for symbol {instrument.symbol}.")
 
 
 def source_warning(symbol: str, source_name: str, exc: Exception) -> str:

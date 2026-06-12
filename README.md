@@ -1,33 +1,31 @@
 # Financial Research Agent
 
-本项目是一个本地优先的命令行投资研究报告生成器。
+这是一个本地优先的中国ETF风格轮动研究报告生成器。
 
 核心流程很简单：
 
 ```text
-免费公开数据源 -> 本地因子筛选 -> 本地大模型 API -> Markdown/PDF 报告
+中国ETF价格爬虫 -> 本地因子筛选 -> 本地大模型多智能体分析 -> Markdown/PDF 报告
 ```
 
-项目只用于个人投资研究和候选标的优先级排序，不构成投资建议、交易指令或自动交易系统。
+项目只用于个人投资研究和候选ETF优先级排序，不构成投资建议、交易指令或自动交易系统。
 
-## 最小运行环境
+## 运行环境
 
 - Linux server
 - Python 3.11+
 - uv
-- 可访问外网，用于获取公开市场数据
+- 可访问外网，用于爬取公开价格数据
 - 本地 OpenAI-compatible LLM API
-- 推荐服务器：2 卡 RTX 4090
+- 推荐服务器：2 张 RTX 4090
 
 ## 1. 启动本地大模型 API
 
-推荐直接用 `vLLM` 启动 OpenAI-compatible API。
-
-示例：
+直接用 `vLLM` 启动 OpenAI-compatible API 即可：
 
 ```bash
 python -m vllm.entrypoints.openai.api_server \
-  --model /path/to/your/model \
+  --model /home/ma-user/work/dataset/harness_summary/models/Qwen8B \
   --served-model-name Qwen/Qwen2.5-1.5B-Instruct \
   --host 0.0.0.0 \
   --port 8001 \
@@ -36,15 +34,13 @@ python -m vllm.entrypoints.openai.api_server \
   --tensor-parallel-size 2
 ```
 
-如果使用较小模型，可以把 `--tensor-parallel-size` 改成 `1`。只要服务兼容 `/v1/chat/completions` 即可。
-
-关键点：`--served-model-name` 要和后面 `.env` 里的 `LOCAL_LLM_MODEL` 保持一致。
-
-检查服务：
+检查模型服务：
 
 ```bash
 curl http://127.0.0.1:8001/v1/models
 ```
+
+`LOCAL_LLM_MODEL` 必须等于这个接口返回的模型 `id`，或者等于你在 vLLM 启动时设置的 `--served-model-name`。
 
 ## 2. 安装项目
 
@@ -58,16 +54,16 @@ uv pip install -e .
 
 ## 3. 配置 `.env`
 
-最小配置如下：
+最小配置：
 
 ```bash
-FRA_CONFIG_PATH=configs/data_source_spike.json
+FRA_CONFIG_PATH=configs/china_etf_rotation.json
 FRA_DATABASE_PATH=data/app.db
 FRA_RAW_DIR=data/raw/mvp
 FRA_REPORT_DIR=reports
-
-SEC_USER_AGENT=FinancialResearchAgent/0.1 your-email@example.com
-ALPHA_VANTAGE_API_KEY=
+FRA_REQUIRE_PRICE_HISTORY=true
+FRA_MIN_PRICE_ROWS=60
+FRA_MIN_PRICE_COVERAGE_RATIO=0.8
 
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
 LOCAL_LLM_API_KEY=local
@@ -75,26 +71,16 @@ LOCAL_LLM_MODEL=Qwen/Qwen2.5-1.5B-Instruct
 LOCAL_LLM_TIMEOUT_SECONDS=180
 ```
 
-如果模型服务在另一台机器，把 `LOCAL_LLM_BASE_URL` 改成内网地址。
+当前默认研究范围是 A股和中国上市ETF，不做美股预测。默认配置文件是：
 
-如果不确定模型名，先看 vLLM 返回的 id：
-
-```bash
-curl http://127.0.0.1:8001/v1/models
+```text
+configs/china_etf_rotation.json
 ```
 
-然后把返回的 `id` 填到 `LOCAL_LLM_MODEL`。
-
-## 4. 运行报告生成
+## 4. 生成报告
 
 ```bash
 python -m backend.app.cli generate-report --top-n 10
-```
-
-也可以使用 console script：
-
-```bash
-fra-report generate-report --top-n 10
 ```
 
 成功后会输出：
@@ -104,13 +90,15 @@ reports/YYYY-MM-DD/investment_report_*.md
 reports/YYYY-MM-DD/investment_report_*.pdf
 ```
 
-正式报告默认要求价格数据覆盖率达标。系统会优先通过网络抓取价格数据：
+正式报告默认要求价格数据过关。如果价格覆盖率不足，系统会停止生成报告，而不是生成一份没有参考价值的报告。
+
+临时诊断可以使用：
 
 ```bash
-python -m backend.app.cli generate-report --top-n 10
+python -m backend.app.cli generate-report --top-n 10 --allow-weak-price-data
 ```
 
-如果网络价格源暂时不可用，可以使用 `--allow-weak-price-data` 做诊断，但不建议把它作为正式研究输出。价格数据门槛见 [project-critical-path.md](docs/project-critical-path.md)。
+这个参数只用于排错，不建议作为正式研究输出。
 
 ## 5. 验证
 
@@ -119,60 +107,26 @@ python -m unittest discover -s tests
 python -m compileall backend
 ```
 
+如果 Windows 上 `compileall` 因 `__pycache__` 权限失败，可以用不写 `.pyc` 的语法检查替代。
+
 ## 数据源说明
 
-当前默认配置在 `configs/data_source_spike.json`，主要用于验证免费公开数据源和报告生成闭环。
+当前中国ETF默认价格源：
 
-当前支持：
+- Eastmoney 日线 K 线接口：价格、开高低收、成交量
+- raw snapshot 缓存：网络失败时可读取最近一次成功抓取
+- 本地 CSV：只作为诊断路径，不作为项目运行前提
 
-- Yahoo chart endpoint：价格历史
-- SEC companyfacts：美股基本面字段覆盖
-- Nasdaq stock RSS：新闻标题
-- Alpha Vantage daily：可选价格 fallback
-- Stooq：可选价格 fallback
+旧版报告中大量数据无法获取，主要不是权限问题，而是目标错配：
 
-诊断单个标的：
+- Yahoo 经常对服务器 IP 返回 `HTTP 403`
+- Stooq 可能返回 HTML verification page
+- Alpha Vantage 需要 API key
+- SEC 和 Nasdaq RSS 是美股数据源，不适合中国ETF报告
 
-```bash
-python -m backend.app.data_sources.probe AAPL
-```
+因此新版本默认不再依赖这些美股数据源。
 
-## 常见问题
-
-LLM 连接失败：
-
-```bash
-curl http://127.0.0.1:8001/v1/models
-```
-
-如果报错里出现了一个你没有写进 `.env` 的旧模型名，检查当前 shell 是否有旧环境变量：
-
-```bash
-echo $LOCAL_LLM_MODEL
-unset LOCAL_LLM_MODEL
-```
-
-依赖缺失：
-
-```bash
-source .venv/bin/activate
-uv pip install -e .
-```
-
-数据源被限制：
-
-```bash
-nano .env
-# 填写 ALPHA_VANTAGE_API_KEY 作为备用价格源
-```
-
-报告没有生成：
-
-```bash
-find reports -maxdepth 3 -type f | sort | tail
-```
-
-## 主要代码位置
+## 核心代码位置
 
 ```text
 backend/app/cli.py
@@ -183,4 +137,5 @@ backend/app/research/prompts.py
 backend/app/data_sources/connectors.py
 backend/app/factors/engine.py
 backend/app/reports/
+configs/china_etf_rotation.json
 ```
