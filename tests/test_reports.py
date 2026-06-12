@@ -5,7 +5,9 @@ from pathlib import Path
 from backend.app.cli import build_parser
 from backend.app.models.schemas import Candidate, FactorScore, ScreeningResponse
 from backend.app.reports.markdown import render_markdown_report
+from backend.app.reports.markdown import strip_reasoning_blocks as strip_markdown_reasoning
 from backend.app.reports.pdf import render_pdf_from_markdown
+from backend.app.research.local_llm import strip_reasoning_blocks as strip_llm_reasoning
 from backend.app.research.prompts import build_agent_prompts, build_report_prompt, build_synthesis_prompt
 
 
@@ -78,6 +80,12 @@ class ReportTests(unittest.TestCase):
         self.assertIn("# Investment Research Report", markdown)
         self.assertIn("| 1 | AAPL |", markdown)
         self.assertIn("not financial advice", markdown)
+
+    def test_reasoning_blocks_are_removed(self) -> None:
+        content = "<think>hidden reasoning</think>\n## 报告正文"
+
+        self.assertEqual(strip_llm_reasoning(content).strip(), "## 报告正文")
+        self.assertEqual(strip_markdown_reasoning(content).strip(), "## 报告正文")
 
     def test_cli_defaults_top_n_to_10(self) -> None:
         parser = build_parser()

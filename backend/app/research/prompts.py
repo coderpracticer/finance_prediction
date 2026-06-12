@@ -60,8 +60,10 @@ def build_report_prompt(screening: ScreeningResponse, horizons: tuple[str, ...])
         "6. 优先使用 Momentum、Risk、Volume/Attention、Event/Catalyst、Quality、Data Coverage "
         "这些结构化因子作为证据。\n"
         "7. 如果价格、成交量或基本面数据缺失，必须明确降低结论强度，不要把新闻数量当成充分买入理由。\n"
-        "8. 明确说明这是研究优先级，不是确定性买卖建议。\n"
-        "9. 不要使用未提供的实时价格、估值、财务数据或新闻细节。\n\n"
+        "8. 只能基于新闻标题样例描述事件主题；如果只看到新闻数量而没有标题，不得推断新闻主题。\n"
+        "9. 不要输出 <think>、推理草稿、内部分析过程，只输出最终报告。\n"
+        "10. 明确说明这是研究优先级，不是确定性买卖建议。\n"
+        "11. 不要使用未提供的实时价格、估值、财务数据或新闻细节。\n\n"
         "建议结构:\n"
         "## 总体结论\n"
         "## 候选分层\n"
@@ -89,6 +91,7 @@ def build_agent_prompts(
                 system_prompt=(
                     f"你是{display_name}。{responsibility}"
                     "只能基于用户提供的结构化证据分析，不得编造未提供的数据。"
+                    "不要输出 <think>、推理草稿或内部分析过程。"
                     "输出要简洁但具体，服务于最终中文投资研究报告。"
                 ),
                 user_prompt=(
@@ -120,6 +123,7 @@ def build_synthesis_prompt(
         f"{agent_sections}\n\n"
         "请作为最终研究写作智能体，综合候选证据和各智能体中间结论，"
         "生成完整中文研究报告。需要保留分歧和数据限制，不能为了形成结论而忽略风险。"
+        "不要输出 <think>、推理草稿或内部分析过程。"
     )
 
 

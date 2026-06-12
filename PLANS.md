@@ -24,7 +24,12 @@
 - [x] Add regression coverage for Yahoo price parsing and updated factor summary behavior.
 - [x] Split one report-writing prompt into lightweight multi-agent prompts.
 - [x] Add data quality, momentum, risk, opportunity, and final synthesis roles.
-- [ ] Validate full report generation against the real 2x4090 local LLM API.
+- [x] Validate full report generation against the real 2x4090 local LLM API.
+- [x] Inspect generated 2026-06-12 report and runtime log.
+- [x] Strip Qwen3 reasoning blocks from final reports.
+- [x] Add real news-title samples to event evidence.
+- [x] Penalize missing price history as weak data quality.
+- [x] Expand cache lookup across sibling raw snapshot directories.
 
 ## Next Technical Improvements
 
@@ -35,3 +40,4 @@
 - [ ] Add retry/backoff controls for public data sources.
 - [x] Add richer short-term and 1-3 month factor sets.
 - [ ] Add a scheduled server cron/systemd example after manual generation is stable.
+- [ ] Add a stable price-data provider path for server runs.

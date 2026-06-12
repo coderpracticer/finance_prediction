@@ -57,7 +57,7 @@ def render_markdown_report(
         "## Data Source Health\n\n"
         f"{warning_summary}\n\n"
         "## LLM Research Summary\n\n"
-        f"{llm_report.strip()}\n\n"
+        f"{strip_reasoning_blocks(llm_report).strip()}\n\n"
         "## Ranked Candidates\n\n"
         "| Rank | Symbol | Opportunity Score | Confidence | Data Quality |\n"
         "| ---: | --- | ---: | ---: | --- |\n"
@@ -90,3 +90,12 @@ def summarize_warnings(warnings: list[str]) -> str:
     for source, count in sorted(source_counts.items()):
         lines.append(f"- {source}: {count}")
     return "\n".join(lines)
+
+
+def strip_reasoning_blocks(content: str) -> str:
+    while True:
+        start = content.find("<think>")
+        end = content.find("</think>")
+        if start == -1 or end == -1 or end < start:
+            return content
+        content = content[:start] + content[end + len("</think>") :]

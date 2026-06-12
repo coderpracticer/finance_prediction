@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from backend.app.models.schemas import FactorScore, FundamentalSnapshot, InstrumentDataset, PriceBar
+from backend.app.models.schemas import FactorScore, FundamentalSnapshot, InstrumentDataset, NewsItem, PriceBar
 
 
 def calculate_factors(dataset: InstrumentDataset) -> list[FactorScore]:
@@ -194,10 +194,15 @@ def _volume_factors(prices: list[PriceBar]) -> list[FactorScore]:
     ]
 
 
-def _event_factors(news: list[object]) -> list[FactorScore]:
+def _event_factors(news: list[NewsItem]) -> list[FactorScore]:
     count = len(news)
     score = clamp(35 + count * 4, 0, 100)
     confidence = 0.75 if count else 0.3
+    titles = [item.title for item in news[:3] if item.title]
+    if titles:
+        evidence = f"{count} recent Nasdaq RSS items were found. Sample titles: " + " | ".join(titles)
+    else:
+        evidence = f"{count} recent Nasdaq RSS items were found. No titles were provided."
     return [
         FactorScore(
             name="news_attention",
@@ -205,7 +210,7 @@ def _event_factors(news: list[object]) -> list[FactorScore]:
             score=score,
             confidence=confidence,
             raw_value=count,
-            evidence=f"{count} recent Nasdaq RSS items were found.",
+            evidence=evidence,
         )
     ]
 
@@ -246,7 +251,11 @@ def aggregate_score(factors: list[FactorScore]) -> tuple[float, float, str]:
     confidence_sum = sum(factor.confidence for factor in factors)
     opportunity_score = weighted / confidence_sum if confidence_sum else 0
     confidence = confidence_sum / len(factors)
-    if confidence >= 0.7:
+    coverage = next((factor for factor in factors if factor.name == "evidence_coverage"), None)
+    if coverage is not None and coverage.score < 50:
+        opportunity_score *= 0.75
+        data_quality = "weak"
+    elif confidence >= 0.7:
         data_quality = "good"
     elif confidence >= 0.45:
         data_quality = "mixed"

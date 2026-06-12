@@ -42,7 +42,7 @@ class LocalLLMResearchWriter:
             system_prompt=(
                 "你是最终研究写作智能体。你负责综合多个专业智能体的中间结论，"
                 "生成中文公开市场投资研究报告。只能基于提供的结构化证据和中间结论，"
-                "不得编造未提供的数据，不给确定性买卖建议。"
+                "不得编造未提供的数据，不给确定性买卖建议，不要输出 <think> 或内部推理草稿。"
             ),
             progress=progress,
             agent_name="final_research_writer",
@@ -104,4 +104,13 @@ class LocalLLMResearchWriter:
         content = data.get("choices", [{}])[0].get("message", {}).get("content")
         if not isinstance(content, str) or not content.strip():
             raise LocalLLMError("Local LLM API returned an empty report.")
-        return content.strip()
+        return strip_reasoning_blocks(content).strip()
+
+
+def strip_reasoning_blocks(content: str) -> str:
+    while True:
+        start = content.find("<think>")
+        end = content.find("</think>")
+        if start == -1 or end == -1 or end < start:
+            return content
+        content = content[:start] + content[end + len("</think>") :]

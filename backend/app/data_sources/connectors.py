@@ -100,6 +100,8 @@ class DataSourceClient:
                         f"{instrument.symbol}: using cached price rows={len(prices)} "
                         f"from {snapshot_path.name}"
                     )
+            elif progress:
+                progress(f"{instrument.symbol}: no cached price snapshot found")
 
         try:
             if progress:
@@ -285,12 +287,18 @@ class DataSourceClient:
     def latest_snapshot(self, source_name: str, symbol: str, suffix: str) -> Path | None:
         safe_source = safe_snapshot_name(source_name)
         safe_symbol = safe_snapshot_name(symbol)
-        matches = sorted(
-            self.raw_dir.glob(f"*_{safe_source}_{safe_symbol}.{suffix}"),
-            key=lambda path: path.stat().st_mtime,
-            reverse=True,
-        )
+        matches: list[Path] = []
+        pattern = f"*_{safe_source}_{safe_symbol}.{suffix}"
+        for root in self.cache_roots():
+            matches.extend(root.glob(pattern))
+        matches = sorted(set(matches), key=lambda path: path.stat().st_mtime, reverse=True)
         return matches[0] if matches else None
+
+    def cache_roots(self) -> list[Path]:
+        roots = [self.raw_dir]
+        if self.raw_dir.parent.name == "raw" and self.raw_dir.parent.exists():
+            roots.extend(path for path in self.raw_dir.parent.iterdir() if path.is_dir())
+        return list(dict.fromkeys(roots))
 
 
 def _list_get(values: list[Any] | None, index: int) -> Any:

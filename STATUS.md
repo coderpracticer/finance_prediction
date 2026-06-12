@@ -36,7 +36,7 @@
 
 ## In Progress
 
-- Real server end-to-end validation of the improved report is pending.
+- Server report generation works; price data source reliability is the current main quality blocker.
 
 ## Next Actions
 
@@ -57,7 +57,7 @@
 ## Validation Results
 
 - `uv pip install -e .`: succeeded after allowing uv to use its external cache directory.
-- `python -m unittest discover -s tests`: 16 tests passed.
+- `python -m unittest discover -s tests`: 20 tests passed.
 - `python -m compileall backend`: passed.
 - `python -m backend.app.cli --help`: CLI help renders successfully.
 - Source scan found no active FastAPI/Dashboard/API/chat route references.
@@ -103,3 +103,23 @@
   - `opportunity_scout`
   - `final_research_writer`
 - Each role uses the same local OpenAI-compatible LLM API with a different system prompt.
+
+## Latest 2026-06-12 Report Review
+
+- Runtime log confirms the full multi-agent chain ran successfully:
+  - `data_quality_auditor`
+  - `momentum_technical_analyst`
+  - `risk_challenger`
+  - `opportunity_scout`
+  - `final_research_writer`
+- Markdown and PDF were generated under `report/2026-06-12`.
+- Main quality blocker: all 16 instruments had `prices=0`.
+  - Yahoo returned HTTP 403.
+  - Alpha Vantage key was not set.
+  - Stooq returned an HTML verification page.
+  - Cached fallback count was 0 for that run.
+- Follow-up fixes applied:
+  - Strip `<think>...</think>` reasoning blocks from LLM outputs and Markdown reports.
+  - Add news-title samples to event evidence so the LLM does not infer news themes from counts alone.
+  - Penalize missing price history by marking low data coverage as `weak` and discounting score.
+  - Search sibling raw snapshot directories for cached price/news/fundamental data.

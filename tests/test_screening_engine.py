@@ -54,6 +54,27 @@ class ScreeningEngineTests(unittest.TestCase):
         self.assertGreater(confidence, 0)
         self.assertIn(data_quality, {"good", "mixed", "weak"})
 
+    def test_missing_price_history_marks_data_quality_weak(self) -> None:
+        dataset = InstrumentDataset(
+            instrument=Instrument(symbol="TEST", name="Test Corp"),
+            prices=[],
+            news=[NewsItem(title="Specific catalyst title") for _ in range(3)],
+            fundamentals=FundamentalSnapshot(
+                metric_count=3,
+                available_metrics=["Revenues", "NetIncomeLoss", "EarningsPerShareDiluted"],
+                has_revenue=True,
+                has_net_income=True,
+                has_eps=True,
+            ),
+        )
+
+        factors = calculate_factors(dataset)
+        _score, _confidence, data_quality = aggregate_score(factors)
+        event_factor = next(factor for factor in factors if factor.name == "news_attention")
+
+        self.assertEqual(data_quality, "weak")
+        self.assertIn("Specific catalyst title", event_factor.evidence)
+
     def test_build_evidence_summary_uses_top_factors(self) -> None:
         dataset = InstrumentDataset(
             instrument=Instrument(symbol="TEST", name="Test Corp"),
